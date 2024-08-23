@@ -1,30 +1,38 @@
 package main
 
 import (
+	"asset-manager/config"
 	"asset-manager/image"
-	"asset-manager/settings"
+	"log"
 	"net/http"
 	"os"
 )
 
-type config struct {
-	Port string `json:"port"`
-}
-
-var options config
+var conf config.Config
 
 func init() {
-	settings.Load(&options)
+	var err error
+	conf, err = config.Load()
+	switch {
+	case err != nil:
+		log.Fatalf("Failed to load config: %v", err)
+	case conf.Port == "":
+		log.Fatalf("Invalid port: %v", conf.Port)
+	}
 }
 
 func main() {
 	wd, _ := os.Getwd()
 
-	http.HandleFunc("/img/", image.Serve)
+	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
+		http.HandleFunc("/img/", image.Serve)
+	} else {
+		log.Println("Warning: images are served as static files due to missing config.")
+	}
+
 	http.Handle("/", http.FileServer(http.Dir(wd+"/public")))
 
-	err := http.ListenAndServe(":"+options.Port, nil)
-	if err != nil {
-		panic(err)
+	if err := http.ListenAndServe(":"+conf.Port, nil); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
 	}
 }

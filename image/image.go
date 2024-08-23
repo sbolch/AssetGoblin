@@ -1,7 +1,7 @@
 package image
 
 import (
-	"asset-manager/settings"
+	"asset-manager/config"
 	"log"
 	"net/http"
 	"os"
@@ -10,25 +10,24 @@ import (
 	"strings"
 )
 
-type config struct {
-	Formats []string          `json:"image_formats"`
-	Presets map[string]string `json:"image_presets"`
-}
-
-var options config
+var conf config.Config
 
 func init() {
-	settings.Load(&options)
+	var err error
+	conf, err = config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 }
 
-func Serve(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+func Serve(res http.ResponseWriter, req *http.Request) {
+	log.Println(req.Method, req.URL.Path, req.RemoteAddr, req.UserAgent())
 
 	wd, _ := os.Getwd()
 
-	splitPath := strings.Split(r.URL.Path, "/")
+	splitPath := strings.Split(req.URL.Path, "/")
 	if len(splitPath) < 4 {
-		http.NotFound(w, r)
+		http.NotFound(res, req)
 		return
 	}
 
@@ -40,20 +39,20 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the requested format is valid
 	if !isValidFormat(requestedExt) {
-		http.Error(w, "Unsupported format: "+requestedExt, http.StatusBadRequest)
+		http.Error(res, "Unsupported format: "+requestedExt, http.StatusBadRequest)
 		return
 	}
 
-	presetValue, hasPreset := options.Presets[presetName]
+	presetValue, hasPreset := conf.Image.Presets[presetName]
 	if !hasPreset {
-		http.Error(w, "Unsupported preset: "+presetName, http.StatusBadRequest)
+		http.Error(res, "Unsupported preset: "+presetName, http.StatusBadRequest)
 		return
 	}
 
 	// Search for the file with any of the supported formats
 	foundPath, found := findImage(strings.TrimSuffix(requestedPath, requestedExt))
 	if !found {
-		http.NotFound(w, r)
+		http.NotFound(res, req)
 		return
 	}
 
@@ -61,9 +60,8 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 
 	// If cached version doesn't exist, generate, cache, and serve it
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
-		err := os.MkdirAll(filepath.Dir(finalPath), os.ModePerm)
-		if err != nil {
-			http.Error(w, "Error while converting image #1", http.StatusInternalServerError)
+		if err = os.MkdirAll(filepath.Dir(finalPath), os.ModePerm); err != nil {
+			http.Error(res, "Error while converting image #1", http.StatusInternalServerError)
 			return
 		}
 		vipsEncoded := false
@@ -77,18 +75,18 @@ func Serve(w http.ResponseWriter, r *http.Request) {
 		if !vipsEncoded {
 			cmd := exec.Command("convert", foundPath, "-resize", presetValue, finalPath)
 			if err = cmd.Run(); err != nil {
-				http.Error(w, "Error while converting image #2", http.StatusInternalServerError)
+				http.Error(res, "Error while converting image #2", http.StatusInternalServerError)
 				return
 			}
 		}
 	}
 
-	http.ServeFile(w, r, finalPath)
+	http.ServeFile(res, req, finalPath)
 }
 
-func isValidFormat(f string) bool {
-	for _, format := range options.Formats {
-		if f == "."+format {
+func isValidFormat(format string) bool {
+	for _, ext := range conf.Image.Formats {
+		if format == "."+ext {
 			return true
 		}
 	}
@@ -96,8 +94,8 @@ func isValidFormat(f string) bool {
 }
 
 func findImage(base string) (string, bool) {
-	for _, format := range options.Formats {
-		path := base + "." + format
+	for _, ext := range conf.Image.Formats {
+		path := base + "." + ext
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			return path, true
 		}
