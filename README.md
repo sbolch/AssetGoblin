@@ -5,7 +5,8 @@
 ## Requirements
 
  - Imagick and/or vips
- - assets directory inside working directory
+ - assets directory inside working directory for serving images
+ - public directory inside working directory for serving static files
  - config.json file inside working directory formatted like below
 
 ```json
