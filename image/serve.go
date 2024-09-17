@@ -13,9 +13,7 @@ import (
 var conf config.Config
 
 func init() {
-	var err error
-	conf, err = config.Load()
-	if err != nil {
+	if err := conf.Load(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 }
@@ -34,7 +32,7 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 	presetName := splitPath[2]
 	path := strings.Join(splitPath[3:], "/")
 
-	requestedPath := wd + "/assets/img/" + path
+	requestedPath := wd + "/" + conf.Image.Directory + "/" + path
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
 	// Check if the requested format is valid
@@ -56,7 +54,9 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	finalPath := wd + "/cache" + strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), wd+"/assets") + "/" + presetName + requestedExt
+	finalPath := wd + "/" + conf.Image.CacheDir +
+		strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), wd+"/assets") +
+		"/" + presetName + requestedExt
 
 	// If cached version doesn't exist, generate, cache, and serve it
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
@@ -64,9 +64,9 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, "Error while converting image #1", http.StatusInternalServerError)
 			return
 		}
+
 		vipsEncoded := false
-		// vips avif encoding is really slow atm
-		if requestedExt != ".avif" {
+		if requestedExt != ".avif" || conf.Image.AvifThroughVips {
 			cmd := exec.Command("vips", "thumbnail", foundPath, finalPath, presetValue)
 			if err = cmd.Run(); err == nil {
 				vipsEncoded = true
@@ -82,23 +82,4 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 	}
 
 	http.ServeFile(res, req, finalPath)
-}
-
-func isValidFormat(format string) bool {
-	for _, ext := range conf.Image.Formats {
-		if format == "."+ext {
-			return true
-		}
-	}
-	return false
-}
-
-func findImage(base string) (string, bool) {
-	for _, ext := range conf.Image.Formats {
-		path := base + "." + ext
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			return path, true
-		}
-	}
-	return "", false
 }
