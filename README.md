@@ -1,4 +1,4 @@
-<div style="text-align: center;"><img src="logo.svg" alt="AssetGoblin" width="256"></div>
+<div align="center"><img src="logo.svg" alt="AssetGoblin" width="256"></div>
 
 # AssetGoblin
 
