@@ -29,12 +29,12 @@
 }
 ```
 > [!NOTE]
-> *During its first run AssetGoblin encodes the config in [gob](https://pkg.go.dev/encoding/gob) format.*
-> *If you want to modify the configuration, edit your json file, then delete the gob file, so it can re-encode it.*
+> During its first run AssetGoblin encodes the config in [gob](https://pkg.go.dev/encoding/gob) format.
+> If you want to modify the configuration, edit your json file, then delete the gob file, so it can re-encode it.
 
 > [!NOTE]
-> *Avif through vips is disabled as default because that encoding is really slow at the moment.*
-> *If you want to use avif files, you must have Imagick.*
+> Avif through vips is disabled by default because that encoding is really slow at the moment.
+> If you want to use avif files, you must have ImageMagick installed.
 
 ## URLs
 
