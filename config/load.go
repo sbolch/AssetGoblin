@@ -48,13 +48,12 @@ func (config *Config) Load() error {
 	} else if err != nil {
 		return fmt.Errorf("unable to open config file: %w", err)
 	}
+	defer closeFile(file)
 
 	decoder := gob.NewDecoder(file)
 	if err = decoder.Decode(config); err != nil {
 		return fmt.Errorf("unable to decode config file: %w", err)
 	}
-
-	defer closeFile(file)
 
 	return nil
 }
