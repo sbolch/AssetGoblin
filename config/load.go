@@ -7,12 +7,12 @@ import (
 )
 
 type Config struct {
-	Image     *image
+	Image     *Image
 	Port      string
 	PublicDir string
 }
 
-type image struct {
+type Image struct {
 	AvifThroughVips bool
 	CacheDir        string
 	Directory       string
@@ -31,7 +31,7 @@ func (config *Config) Load() error {
 
 		config.Port = jsonConfig.Port
 		config.PublicDir = jsonConfig.PublicDir
-		config.Image = &image{
+		config.Image = &Image{
 			AvifThroughVips: jsonConfig.Image.AvifThroughVips,
 			CacheDir:        jsonConfig.Image.CacheDir,
 			Directory:       jsonConfig.Image.Directory,

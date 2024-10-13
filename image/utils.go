@@ -1,9 +1,16 @@
 package image
 
-import "os"
+import (
+	"assetgoblin/config"
+	"os"
+)
 
-func findImage(base string) (string, bool) {
-	for _, ext := range conf.Image.Formats {
+type Service struct {
+	Config *config.Image
+}
+
+func (s *Service) findImage(base string) (string, bool) {
+	for _, ext := range s.Config.Formats {
 		path := base + "." + ext
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			return path, true
@@ -12,8 +19,8 @@ func findImage(base string) (string, bool) {
 	return "", false
 }
 
-func isValidFormat(format string) bool {
-	for _, ext := range conf.Image.Formats {
+func (s *Service) isValidFormat(format string) bool {
+	for _, ext := range s.Config.Formats {
 		if format == "."+ext {
 			return true
 		}

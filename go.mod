@@ -1,3 +1,3 @@
-module asset-manager
+module assetgoblin
 
 go 1.22

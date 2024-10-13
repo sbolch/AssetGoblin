@@ -1,7 +1,6 @@
 package image
 
 import (
-	"asset-manager/config"
 	"log"
 	"net/http"
 	"os"
@@ -10,15 +9,7 @@ import (
 	"strings"
 )
 
-var conf config.Config
-
-func init() {
-	if err := conf.Load(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-}
-
-func Serve(res http.ResponseWriter, req *http.Request) {
+func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	log.Println(req.Method, req.URL.Path, req.RemoteAddr, req.UserAgent())
 
 	wd, _ := os.Getwd()
@@ -32,29 +23,29 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 	presetName := splitPath[2]
 	path := strings.Join(splitPath[3:], "/")
 
-	requestedPath := wd + "/" + conf.Image.Directory + "/" + path
+	requestedPath := wd + "/" + s.Config.Directory + "/" + path
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
 	// Check if the requested format is valid
-	if !isValidFormat(requestedExt) {
+	if !s.isValidFormat(requestedExt) {
 		http.Error(res, "Unsupported format: "+requestedExt, http.StatusBadRequest)
 		return
 	}
 
-	presetValue, hasPreset := conf.Image.Presets[presetName]
+	presetValue, hasPreset := s.Config.Presets[presetName]
 	if !hasPreset {
 		http.Error(res, "Unsupported preset: "+presetName, http.StatusBadRequest)
 		return
 	}
 
 	// Search for the file with any of the supported formats
-	foundPath, found := findImage(strings.TrimSuffix(requestedPath, requestedExt))
+	foundPath, found := s.findImage(strings.TrimSuffix(requestedPath, requestedExt))
 	if !found {
 		http.NotFound(res, req)
 		return
 	}
 
-	finalPath := wd + "/" + conf.Image.CacheDir +
+	finalPath := wd + "/" + s.Config.CacheDir +
 		strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), wd+"/assets") +
 		"/" + presetName + requestedExt
 
@@ -66,7 +57,7 @@ func Serve(res http.ResponseWriter, req *http.Request) {
 		}
 
 		vipsEncoded := false
-		if requestedExt != ".avif" || conf.Image.AvifThroughVips {
+		if requestedExt != ".avif" || s.Config.AvifThroughVips {
 			cmd := exec.Command("vips", "thumbnail", foundPath, finalPath, presetValue)
 			if err = cmd.Run(); err == nil {
 				vipsEncoded = true

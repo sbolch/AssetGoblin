@@ -7,18 +7,16 @@ import (
 )
 
 type jsonConfig struct {
-	Image     *jsonImage `json:"image"`
-	Port      string     `json:"port"`
-	PublicDir string     `json:"public_dir"`
-}
-
-type jsonImage struct {
-	AvifThroughVips bool              `json:"avif_through_vips"`
-	CacheDir        string            `json:"cache_dir"`
-	Directory       string            `json:"directory"`
-	Formats         []string          `json:"formats"`
-	Path            string            `json:"path"`
-	Presets         map[string]string `json:"presets"`
+	Image struct {
+		AvifThroughVips bool              `json:"avif_through_vips"`
+		CacheDir        string            `json:"cache_dir"`
+		Directory       string            `json:"directory"`
+		Formats         []string          `json:"formats"`
+		Path            string            `json:"path"`
+		Presets         map[string]string `json:"presets"`
+	} `json:"image"`
+	Port      string `json:"port"`
+	PublicDir string `json:"public_dir"`
 }
 
 func loadJson() (jsonConfig, error) {
