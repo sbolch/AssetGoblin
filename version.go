@@ -26,6 +26,7 @@ var archMap = map[string]string{
 
 type release struct {
 	Assets  []releaseAsset `json:"assets"`
+	Body    string         `json:"body"`
 	TagName string         `json:"tag_name"`
 }
 
@@ -66,7 +67,7 @@ func update() {
 	}
 
 	if latest == Version {
-		log.Println("Already up to date")
+		log.Println("Already up to date.")
 		os.Exit(0)
 	}
 
@@ -271,6 +272,9 @@ func update() {
 	}
 
 	log.Println("Update finished successfully.")
+
+	// Print the release notes
+	log.Println(r.Body)
 
 	os.Exit(0)
 }
