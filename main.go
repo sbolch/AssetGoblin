@@ -3,6 +3,8 @@ package main
 import (
 	"assetgoblin/config"
 	"assetgoblin/image"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +12,26 @@ import (
 
 var conf config.Config
 
-func init() {
+func main() {
+	versionFlag := flag.Bool("version", false, "Print version info")
+	updateFlag := flag.Bool("update", false, "Update to latest version")
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println("Version:", Version)
+		latest, _ := getLatestVersion()
+		if latest != Version {
+			fmt.Println("Update available:", latest)
+		}
+		os.Exit(0)
+	} else if *updateFlag {
+		update()
+	}
+
+	run()
+}
+
+func run() {
 	if err := conf.Load(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -18,9 +39,7 @@ func init() {
 	if conf.Port == "" {
 		log.Fatalf("Invalid port: %v", conf.Port)
 	}
-}
 
-func main() {
 	wd, _ := os.Getwd()
 
 	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
