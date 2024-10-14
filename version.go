@@ -266,6 +266,14 @@ func update() {
 		log.Fatalf("Failed to replace current executable: %v", err)
 	}
 
+	// Set the permissions on the new executable
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(currentExecutable, 0755); err != nil {
+			log.Fatalf("Failed to set permissions on new executable: %v", err)
+		}
+	}
+
+	// Remove the old executable
 	err = os.Remove(backupExecutable)
 	if err != nil {
 		log.Printf("Warning: %v\n", err)
