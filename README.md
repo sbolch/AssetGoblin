@@ -2,6 +2,8 @@
 
 # AssetGoblin
 
+[![Latest Release](https://img.shields.io/github/v/release/sbolch/AssetGoblin.svg)](https://github.com/sbolch/AssetGoblin/releases)
+
 > Simply manipulate images or serve static files
 
 ## Requirements
@@ -56,3 +58,17 @@ https://localhost:8080/img/sm2x/path/to/image.avif
 ```
 https://localhost:8080/path/to/file
 ```
+
+## Flags
+
+### -help
+
+List flags
+
+### -update
+
+Update to latest version
+
+### -version
+
+Print version info
