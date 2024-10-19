@@ -15,6 +15,11 @@
 {
   "port": "8080",
   "public_dir": "public",
+  "secret": "",
+  "rate_limit": {
+    "limit": 0,
+    "ttl": "1m"
+  },
   "image": {
     "formats": ["avif", "jpeg", "jpg", "png", "tiff", "webp"],
     "presets": {
@@ -58,6 +63,14 @@ https://localhost:8080/img/sm2x/path/to/image.avif
 ```
 https://localhost:8080/path/to/file
 ```
+
+## Rate limiter
+
+soon...
+
+## Token
+
+soon...
 
 ## Flags
 

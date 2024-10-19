@@ -3,6 +3,7 @@ package main
 import (
 	"assetgoblin/config"
 	"assetgoblin/image"
+	"assetgoblin/middleware"
 	"flag"
 	"fmt"
 	"log"
@@ -42,6 +43,8 @@ func run() {
 
 	wd, _ := os.Getwd()
 
+	mux := http.NewServeMux()
+
 	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
 		imageService := image.Service{Config: conf.Image}
 		http.HandleFunc(conf.Image.Path, imageService.Serve)
@@ -49,9 +52,21 @@ func run() {
 		log.Println("Warning: images are served as static files due to missing config.")
 	}
 
-	http.Handle("/", http.FileServer(http.Dir(wd+"/"+conf.PublicDir)))
+	mux.Handle("/", http.FileServer(http.Dir(wd+"/"+conf.PublicDir)))
 
-	if err := http.ListenAndServe(":"+conf.Port, nil); err != nil {
+	var handler http.Handler = mux
+
+	if conf.Secret != "" {
+		signkeyMiddleware := middleware.Signkey{Secret: conf.Secret}
+		handler = signkeyMiddleware.Verify(handler)
+	}
+
+	if conf.RateLimit.Limit > 0 {
+		ratelimitMiddleware := middleware.NewRateLimit(conf.RateLimit)
+		handler = ratelimitMiddleware.Limit(handler)
+	}
+
+	if err := http.ListenAndServe(":"+conf.Port, handler); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

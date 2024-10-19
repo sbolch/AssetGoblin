@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 type jsonConfig struct {
@@ -17,6 +18,11 @@ type jsonConfig struct {
 	} `json:"image"`
 	Port      string `json:"port"`
 	PublicDir string `json:"public_dir"`
+	RateLimit struct {
+		Limit int           `json:"limit"`
+		Ttl   time.Duration `json:"ttl"`
+	} `json:"rate_limit"`
+	Secret string `json:"secret"`
 }
 
 func loadJson() (jsonConfig, error) {
