@@ -9,16 +9,19 @@ import (
 
 type RateLimit struct {
 	sync.Mutex
-	Config    *config.RateLimit
-	requests  map[string]int
-	timestamp map[string]time.Time
+	Config   *config.RateLimit
+	requests map[string]*requestCounter
+}
+
+type requestCounter struct {
+	count       int
+	lastRequest time.Time
 }
 
 func NewRateLimit(config *config.RateLimit) *RateLimit {
 	r := &RateLimit{
-		Config:    config,
-		requests:  make(map[string]int),
-		timestamp: make(map[string]time.Time),
+		Config:   config,
+		requests: make(map[string]*requestCounter),
 	}
 
 	go r.cleanup(5 * time.Minute)
@@ -33,20 +36,19 @@ func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 		r.Lock()
 		defer r.Unlock()
 
-		if count, ok := r.requests[ip]; ok {
-			if time.Since(r.timestamp[ip]) < r.Config.Ttl {
-				if count >= r.Config.Limit {
+		if client, found := r.requests[ip]; found {
+			if time.Since(client.lastRequest) < r.Config.Ttl {
+				if client.count >= r.Config.Limit {
 					http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
 					return
 				}
-				r.requests[ip]++
+				client.count++
 			} else {
-				r.requests[ip] = 1
-				r.timestamp[ip] = time.Now()
+				client.count = 1
 			}
+			client.lastRequest = time.Now()
 		} else {
-			r.requests[ip] = 1
-			r.timestamp[ip] = time.Now()
+			r.requests[ip] = &requestCounter{count: 1, lastRequest: time.Now()}
 		}
 
 		handler.ServeHTTP(res, req)
@@ -55,12 +57,13 @@ func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 
 func (r *RateLimit) cleanup(interval time.Duration) {
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
 	for range ticker.C {
 		r.Lock()
-		for ip, timestamp := range r.timestamp {
-			if time.Since(timestamp) > r.Config.Ttl {
+		for ip, client := range r.requests {
+			if time.Since(client.lastRequest) > r.Config.Ttl {
 				delete(r.requests, ip)
-				delete(r.timestamp, ip)
 			}
 		}
 		r.Unlock()

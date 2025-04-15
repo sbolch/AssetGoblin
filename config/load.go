@@ -50,7 +50,7 @@ func (config *Config) Load() error {
 		}
 		config.RateLimit = &RateLimit{
 			Limit: jsonConfig.RateLimit.Limit,
-			Ttl:   jsonConfig.RateLimit.Ttl,
+			Ttl:   jsonConfig.RateLimit.Ttl.Duration,
 		}
 
 		if err := config.saveGob(); err != nil {

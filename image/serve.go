@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	presetName := splitPath[2]
 	path := strings.Join(splitPath[3:], "/")
 
-	requestedPath := wd + "/" + s.Config.Directory + "/" + path
+	requestedPath := filepath.Join(wd, s.Config.Directory, path)
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
 	// Check if the requested format is valid
@@ -45,14 +46,18 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	finalPath := wd + "/" + s.Config.CacheDir +
-		strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), wd+"/assets") +
-		"/" + presetName + requestedExt
+	finalPath := filepath.Join(
+		wd,
+		s.Config.CacheDir,
+		strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), filepath.Join(wd, s.Config.Directory)),
+		presetName+requestedExt,
+	)
 
 	// If cached version doesn't exist, generate, cache, and serve it
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
 		if err = os.MkdirAll(filepath.Dir(finalPath), os.ModePerm); err != nil {
-			http.Error(res, "Error while converting image #1", http.StatusInternalServerError)
+			log.Println("Error while creating cache:", err)
+			http.Error(res, "Error while creating cache", http.StatusInternalServerError)
 			return
 		}
 
@@ -64,9 +69,14 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if !vipsEncoded {
-			cmd := exec.Command("convert", foundPath, "-resize", presetValue, finalPath)
+			prefix := ""
+			if runtime.GOOS == "windows" {
+				prefix = "magick "
+			}
+			cmd := exec.Command(prefix+"convert", foundPath, "-resize", presetValue, finalPath)
 			if err = cmd.Run(); err != nil {
-				http.Error(res, "Error while converting image #2", http.StatusInternalServerError)
+				log.Println("Error while converting image:", err)
+				http.Error(res, "Error while converting image", http.StatusInternalServerError)
 				return
 			}
 		}
