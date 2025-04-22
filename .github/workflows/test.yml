@@ -21,6 +21,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+      - name: Install ImageMagick and libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick libvips-dev
       - name: Run tests
         run: |
           go test -v ./... -coverprofile=coverage
