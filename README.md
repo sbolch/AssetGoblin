@@ -1,4 +1,4 @@
-<div align="center"><img src="logo.svg" alt="AssetGoblin" width="256"></div>
+![AssetGoblin](assets/header.png)
 
 # AssetGoblin
 
@@ -85,3 +85,7 @@ Update to latest version
 ### -version
 
 Print version info
+
+## Sponsors
+
+<a href="https://gazmag.hu" target="_blank"><img src="https://gazmag.hu/icon/logo-long.svg" alt="GazMag" height="50"></a>
