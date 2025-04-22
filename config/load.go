@@ -4,12 +4,15 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
+	"time"
 )
 
 type Config struct {
 	Image     *Image
 	Port      string
 	PublicDir string
+	RateLimit *RateLimit
+	Secret    string
 }
 
 type Image struct {
@@ -19,6 +22,11 @@ type Image struct {
 	Formats         []string
 	Path            string
 	Presets         map[string]string
+}
+
+type RateLimit struct {
+	Limit int
+	Ttl   time.Duration
 }
 
 func (config *Config) Load() error {
@@ -31,6 +39,7 @@ func (config *Config) Load() error {
 
 		config.Port = jsonConfig.Port
 		config.PublicDir = jsonConfig.PublicDir
+		config.Secret = jsonConfig.Secret
 		config.Image = &Image{
 			AvifThroughVips: jsonConfig.Image.AvifThroughVips,
 			CacheDir:        jsonConfig.Image.CacheDir,
@@ -38,6 +47,10 @@ func (config *Config) Load() error {
 			Formats:         jsonConfig.Image.Formats,
 			Path:            jsonConfig.Image.Path,
 			Presets:         jsonConfig.Image.Presets,
+		}
+		config.RateLimit = &RateLimit{
+			Limit: jsonConfig.RateLimit.Limit,
+			Ttl:   jsonConfig.RateLimit.Ttl.Duration,
 		}
 
 		if err := config.saveGob(); err != nil {

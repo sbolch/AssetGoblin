@@ -4,8 +4,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"os"
 )
-import "os"
 
 func closeFile(file *os.File) {
 	if err := file.Close(); err != nil {

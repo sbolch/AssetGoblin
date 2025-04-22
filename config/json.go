@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 type jsonConfig struct {
@@ -17,6 +18,31 @@ type jsonConfig struct {
 	} `json:"image"`
 	Port      string `json:"port"`
 	PublicDir string `json:"public_dir"`
+	RateLimit struct {
+		Limit int      `json:"limit"`
+		Ttl   Duration `json:"ttl"`
+	} `json:"rate_limit"`
+	Secret string `json:"secret"`
+}
+
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	duration, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+
+	d.Duration = duration
+
+	return nil
 }
 
 func loadJson() (jsonConfig, error) {

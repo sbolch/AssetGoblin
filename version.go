@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"unicode"
 )
 
@@ -41,8 +43,7 @@ func getLatestVersion() (string, error) {
 		return "", err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+		if err := Body.Close(); err != nil {
 			log.Printf("Warning: %v\n", err)
 		}
 	}(res.Body)
@@ -105,8 +106,7 @@ func update() {
 		log.Fatalf("Failed to download update: %v", err)
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
+		if err := Body.Close(); err != nil {
 			log.Printf("Warning: %v\n", err)
 		}
 	}(res.Body)
@@ -120,8 +120,7 @@ func update() {
 		log.Fatalf("Failed to create temporary file: %v", err)
 	}
 	defer func(name string) {
-		err := os.Remove(name)
-		if err != nil {
+		if err := os.Remove(name); err != nil {
 			log.Printf("Warning: %v\n", err)
 		}
 	}(tmpFile.Name())
@@ -136,6 +135,75 @@ func update() {
 		log.Fatalf("Failed to close temporary file: %v", err)
 	}
 
+	// Download the checksum file
+	log.Println("Downloading checksum file...")
+
+	var checksumURL string
+	for _, asset := range r.Assets {
+		if strings.Contains(asset.Name, "checksums") {
+			checksumURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+	if checksumURL == "" {
+		log.Fatal("Failed to verify update.")
+	}
+
+	res, err = http.Get(checksumURL)
+	if err != nil {
+		log.Fatalf("Failed to download checksum file: %v", err)
+	}
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			log.Printf("Warning: %v\n", err)
+		}
+	}(res.Body)
+
+	if res.StatusCode != http.StatusOK {
+		log.Fatalf("Failed to download checksum file: %s", res.Status)
+	}
+
+	checksums := make(map[string]string)
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Fatalf("Failed to read checksum file: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			continue // Skip invalid lines
+		}
+		checksums[parts[1]] = parts[0]
+	}
+	checksum, ok := checksums[updateName]
+	if !ok {
+		log.Fatalf("Failed to find checksum for %s.", updateName)
+	}
+
+	// Verify checksum
+	file, err := os.Open(tmpFile.Name())
+	if err != nil {
+		log.Fatalf("Failed to open archive: %v", err)
+	}
+	defer func(file *os.File) {
+		if err := file.Close(); err != nil {
+			log.Printf("Warning: %v\n", err)
+		}
+	}(file)
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		log.Fatalf("Failed to calculate checksum: %v", err)
+	}
+
+	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
+	if calculatedChecksum != checksum {
+		log.Fatalf("Checksum mismatch: expected %s, got %s", checksum, calculatedChecksum)
+	}
+
+	log.Println("Checksum verified.")
+
 	wd, _ := os.Getwd()
 
 	// Extract the update
@@ -146,8 +214,7 @@ func update() {
 			log.Fatalf("Failed to open archive: %v", err)
 		}
 		defer func(file *os.File) {
-			err := file.Close()
-			if err != nil {
+			if err := file.Close(); err != nil {
 				log.Printf("Warning: %v\n", err)
 			}
 		}(file)
@@ -157,8 +224,7 @@ func update() {
 			log.Fatalf("Failed to open archive: %v", err)
 		}
 		defer func(gz *gzip.Reader) {
-			err := gz.Close()
-			if err != nil {
+			if err := gz.Close(); err != nil {
 				log.Printf("Warning: %v\n", err)
 			}
 		}(gz)
@@ -182,8 +248,7 @@ func update() {
 				log.Fatalf("Failed to create file: %v", err)
 			}
 			if _, err := io.Copy(outFile, tr); err != nil {
-				err := outFile.Close()
-				if err != nil {
+				if err := outFile.Close(); err != nil {
 					log.Printf("Warning: %v\n", err)
 				}
 				log.Fatalf("Failed to write file: %v", err)
@@ -199,8 +264,7 @@ func update() {
 			log.Fatalf("Failed to open archive: %v", err)
 		}
 		defer func(reader *zip.ReadCloser) {
-			err := reader.Close()
-			if err != nil {
+			if err := reader.Close(); err != nil {
 				log.Printf("Warning: %v\n", err)
 			}
 		}(reader)
@@ -216,8 +280,7 @@ func update() {
 			}
 			rc, err := file.Open()
 			if err != nil {
-				err := outFile.Close()
-				if err != nil {
+				if err := outFile.Close(); err != nil {
 					log.Printf("Warning: %v\n", err)
 				}
 				log.Fatalf("Failed to open file: %v", err)

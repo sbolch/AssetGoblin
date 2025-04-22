@@ -1,0 +1,36 @@
+name: tester
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install ImageMagick and libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick libvips-dev
+      - name: Run tests
+        run: |
+          go test -v ./... -coverprofile=coverage
+          go tool cover -html=coverage -o coverage.html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.html

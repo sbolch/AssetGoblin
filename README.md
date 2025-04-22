@@ -1,4 +1,4 @@
-<div align="center"><img src="logo.svg" alt="AssetGoblin" width="256"></div>
+[![AssetGoblin](assets/header.png)](https://github.com/sbolch/AssetGoblin)
 
 # AssetGoblin
 
@@ -15,6 +15,11 @@
 {
   "port": "8080",
   "public_dir": "public",
+  "secret": "",
+  "rate_limit": {
+    "limit": 0,
+    "ttl": "1m"
+  },
   "image": {
     "formats": ["avif", "jpeg", "jpg", "png", "tiff", "webp"],
     "presets": {
@@ -59,11 +64,60 @@ https://localhost:8080/img/sm2x/path/to/image.avif
 https://localhost:8080/path/to/file
 ```
 
-## Flags
+## Rate limiter
+
+The rate limiter is a simple token bucket algorithm that limits the number of requests to a given path.
+
+The rate limit is defined in the config file under the `rate_limit` key. The `limit` key defines the maximum number of
+requests allowed within the time-to-live (TTL) period, which is defined by the `ttl` key. The TTL is specified in a
+format that can be parsed by Go's `time.ParseDuration` function.
+If you don't need it, just set the limit to 0 (unlimited).
+
+## Token
+
+The token is a hash string that is used to validate the request.
+It's generated from a secret and the request path and is used to prevent unauthorized access to the server.
+
+The secret is defined in the config file under the `secret` key. If you don't want to use tokens, just leave it empty.
+
+If you use it, you must use the same secret to generate the token in your requests.
+You have to pass the token as get parameter in the URL.
+
+You can generate the token like this:
+
+In Go:
+
+```go
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+)
+
+func generateToken(secret, path string) string {
+    hasher := hmac.New(sha256.New, []byte(secret))
+    hasher.Write([]byte(path))
+    return hex.EncodeToString(hasher.Sum(nil))
+}
+```
+
+In PHP:
+
+```php
+$token = hash_hmac('sha256', $path, $secret);
+```
+
+You can definitely use other languages, but the algorithm is the same.
+
+## Usage
 
 ### -help
 
 List flags
+
+### -serve
+
+Run the server
 
 ### -update
 
@@ -72,3 +126,7 @@ Update to latest version
 ### -version
 
 Print version info
+
+## Sponsors
+
+<a href="https://gazmag.hu" target="_blank"><img src="https://gazmag.hu/icon/logo-long.svg" alt="GazMag" height="50"></a>
