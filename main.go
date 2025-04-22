@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 var conf config.Config
@@ -58,12 +59,12 @@ func serve() {
 
 	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
 		imageService := image.Service{Config: conf.Image}
-		http.HandleFunc(conf.Image.Path, imageService.Serve)
+		mux.HandleFunc(conf.Image.Path, imageService.Serve)
 	} else {
 		log.Println("Warning: images are served as static files due to missing config.")
 	}
 
-	mux.Handle("/", http.FileServer(http.Dir(wd+"/"+conf.PublicDir)))
+	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(wd, conf.PublicDir))))
 
 	var handler http.Handler = mux
 
