@@ -1,4 +1,4 @@
-![AssetGoblin](assets/header.png)
+[![AssetGoblin](assets/header.png)](https://github.com/sbolch/AssetGoblin)
 
 # AssetGoblin
 
