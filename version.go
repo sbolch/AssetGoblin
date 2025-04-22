@@ -74,11 +74,16 @@ func update() {
 	log.Printf("Updating from %s to %s\n", Version, latest)
 
 	// Get the name of the update for the current OS
-	osR := []rune(runtime.GOOS)
-	osR[0] = unicode.ToUpper(osR[0])
-	osName := string(osR)
+	var osName string
+	if runtime.GOOS == "darwin" {
+		osName = "macOS"
+	} else {
+		osR := []rune(runtime.GOOS)
+		osR[0] = unicode.ToUpper(osR[0])
+		osName := string(osR)
+	}
 
-	updateName := fmt.Sprintf("AssetGoblin_%s_%s", osName, archMap[runtime.GOARCH])
+	updateName := fmt.Sprintf("AssetGoblin_%s_%s_%s", latest, osName, archMap[runtime.GOARCH])
 	ext := ".tar.gz"
 	if runtime.GOOS == "windows" {
 		ext = ".zip"
