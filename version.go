@@ -80,7 +80,7 @@ func update() {
 	} else {
 		osR := []rune(runtime.GOOS)
 		osR[0] = unicode.ToUpper(osR[0])
-		osName := string(osR)
+		osName = string(osR)
 	}
 
 	updateName := fmt.Sprintf("AssetGoblin_%s_%s_%s", latest, osName, archMap[runtime.GOARCH])
