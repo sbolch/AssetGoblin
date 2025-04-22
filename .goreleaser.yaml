@@ -13,7 +13,7 @@ builds:
       - darwin
     ldflags:
       -X 'main.Version=v{{.Version}}'
-    binary: "{{ .ProjectName | toLower }}{{ if eq .Os \"windows\" }}.exe{{ end }}"
+    binary: assetgoblin{{ if eq .Os "windows" }}.exe{{ end }}
 
 archives:
   - format: tar.gz
