@@ -14,26 +14,36 @@ import (
 var conf config.Config
 
 func main() {
+	serveFlag := flag.Bool("serve", false, "Run the server")
 	versionFlag := flag.Bool("version", false, "Print version info")
 	updateFlag := flag.Bool("update", false, "Update to latest version")
 	flag.Parse()
 
-	if *versionFlag {
-		fmt.Print(Logo)
-		fmt.Println("Version:", Version)
+	if *serveFlag {
+		serve()
+	} else if *versionFlag {
+		fmt.Print(Version)
 		latest, _ := getLatestVersion()
 		if latest != Version {
-			fmt.Println("Update available:", latest)
+			fmt.Print(" (Update available: ", latest, ")")
 		}
+		fmt.Print("\n")
 		os.Exit(0)
 	} else if *updateFlag {
 		update()
 	}
 
-	run()
+	fmt.Println(Logo, "\nVersion:", Version)
+
+	fmt.Println("\nUsage:")
+	flag.PrintDefaults()
+
+	fmt.Println("\nHomepage: https://github.com/sbolch/AssetGoblin")
+
+	os.Exit(0)
 }
 
-func run() {
+func serve() {
 	if err := conf.Load(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}

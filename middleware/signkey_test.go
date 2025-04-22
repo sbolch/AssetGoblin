@@ -40,9 +40,16 @@ func TestSignkey_Verify(t *testing.T) {
 		},
 		{
 			name:       "wrong secret",
-			secret:     "wrong-secret",
+			secret:     "secret",
 			path:       "/test-path",
-			token:      generateToken("secret", "/test-path"),
+			token:      generateToken("wrong-secret", "/test-path"),
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "wrong path",
+			secret:     "secret",
+			path:       "/test-path",
+			token:      generateToken("secret", "/wrong-path"),
 			wantStatus: http.StatusUnauthorized,
 		},
 	}
@@ -66,7 +73,7 @@ func TestSignkey_Verify(t *testing.T) {
 }
 
 func generateToken(secret, path string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(path))
-	return hex.EncodeToString(mac.Sum(nil))
+	hasher := hmac.New(sha256.New, []byte(secret))
+	hasher.Write([]byte(path))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

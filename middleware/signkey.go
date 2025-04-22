@@ -23,8 +23,8 @@ func (s *Signkey) Verify(handler http.Handler) http.Handler {
 }
 
 func (s *Signkey) isValidToken(path, token string) bool {
-	mac := hmac.New(sha256.New, []byte(s.Secret))
-	mac.Write([]byte(path))
-	expectedToken := hex.EncodeToString(mac.Sum(nil))
+	hasher := hmac.New(sha256.New, []byte(s.Secret))
+	hasher.Write([]byte(path))
+	expectedToken := hex.EncodeToString(hasher.Sum(nil))
 	return hmac.Equal([]byte(token), []byte(expectedToken))
 }
