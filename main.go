@@ -19,7 +19,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println(Logo)
+		fmt.Print(Logo)
 		fmt.Println("Version:", Version)
 		latest, _ := getLatestVersion()
 		if latest != Version {

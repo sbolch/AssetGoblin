@@ -85,7 +85,7 @@ func TestConfig_loadJson(t *testing.T) {
 		{
 			name:          "file not found",
 			jsonContent:   "",
-			expectedError: errors.New("unable to read config file: open config.json: The system cannot find the file specified"),
+			expectedError: errors.New("unable to read config file: open config.json"),
 			setup: func(jsonContent string) {
 			},
 			teardown: func() {
