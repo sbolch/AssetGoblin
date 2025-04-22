@@ -4,7 +4,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/sbolch/AssetGoblin.svg)](https://github.com/sbolch/AssetGoblin/releases)
 
-> Simply manipulate images or serve static files
+> Serve static files or dynamically manipulated images with ease
 
 ## Requirements
 
