@@ -13,6 +13,7 @@ builds:
       - darwin
     ldflags:
       -X 'main.Version=v{{.Version}}'
+    binary: "{{ .ProjectName | lower }}{{ if eq .Os \"windows\" }}.exe{{ end }}"
 
 archives:
   - format: tar.gz
