@@ -28,8 +28,8 @@ archives:
       - goos: windows
         format: zip
         
-checksums:
-  - name_template: {{ .ProjectName }}_v{{ .Version }}_checksums.txt
+checksum:
+  name_template: {{ .ProjectName }}_v{{ .Version }}_checksums.txt
 
 changelog:
   sort: asc
