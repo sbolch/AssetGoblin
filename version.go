@@ -20,10 +20,9 @@ import (
 var Version = "development"
 var r *release
 var archMap = map[string]string{
-	"amd64": "x86_64",
-	"386":   "i386",
+	"amd64": "x64",
+	"386":   "x86",
 	"arm64": "arm64",
-	"arm":   "arm",
 }
 
 type release struct {
