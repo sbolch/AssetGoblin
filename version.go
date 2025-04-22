@@ -83,7 +83,7 @@ func update() {
 		osName = string(osR)
 	}
 
-	updateName := fmt.Sprintf("AssetGoblin_%s_%s_%s", latest, osName, archMap[runtime.GOARCH])
+	updateName := fmt.Sprintf("AssetGoblin_v%s_%s_%s", latest, osName, archMap[runtime.GOARCH])
 	ext := ".tar.gz"
 	if runtime.GOOS == "windows" {
 		ext = ".zip"
