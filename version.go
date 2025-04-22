@@ -244,8 +244,8 @@ func update() {
 			}
 
 			filePath := filepath.Join(wd, header.Name)
-			if header.Name == "AssetGoblin" {
-				filePath = filepath.Join(wd, "AssetGoblin_"+latest)
+			if header.Name == "assetgoblin" {
+				filePath = filepath.Join(wd, "assetgoblin_"+latest)
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
@@ -275,8 +275,8 @@ func update() {
 
 		for _, file := range reader.File {
 			filePath := filepath.Join(wd, file.Name)
-			if file.Name == "AssetGoblin.exe" {
-				filePath = filepath.Join(wd, "AssetGoblin_"+latest+".exe")
+			if file.Name == "assetgoblin.exe" {
+				filePath = filepath.Join(wd, "assetgoblin_"+latest+".exe")
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
@@ -314,9 +314,9 @@ func update() {
 	}
 
 	// Replace the current executable with the new one
-	currentExecutable := filepath.Join(wd, "AssetGoblin")
-	backupExecutable := filepath.Join(wd, "AssetGoblin_"+Version)
-	newExecutable := filepath.Join(wd, "AssetGoblin_"+latest)
+	currentExecutable := filepath.Join(wd, "assetgoblin")
+	backupExecutable := filepath.Join(wd, "assetgoblin_"+Version)
+	newExecutable := filepath.Join(wd, "assetgoblin_"+latest)
 	if runtime.GOOS == "windows" {
 		currentExecutable += ".exe"
 		backupExecutable += ".exe"
