@@ -9,7 +9,13 @@
 ## Requirements
 
  - [ImageMagick](https://imagemagick.org) and/or [vips](https://www.libvips.org)
- - config.json file inside working directory formatted like below
+ 
+## Configuration
+
+You can modify any settings in JSON, TOML, YAML, HCL, envfile formats.
+You only need to define the ones you want to override.
+
+### Default settings as JSON
 
 ```json
 {
@@ -37,7 +43,7 @@
 ```
 > [!NOTE]
 > During its first run AssetGoblin encodes the config in [gob](https://pkg.go.dev/encoding/gob) format.
-> If you want to modify the configuration, edit your json file, then delete the gob file, so it can re-encode it.
+> If you want to modify the configuration, edit your config file, then delete the gob file, so it can re-encode it.
 
 > [!NOTE]
 > Avif through vips is disabled by default because that encoding is really slow at the moment.
@@ -47,9 +53,9 @@
 
 ### Images
 
-Resizes image's width (while preserving original ratio) according to the queried preset and transforms it to
-the queried format, e.g. if you have your settings.json just like the one above and a *path/to/image.png* file
-inside */path/to/workdir/assets/img*, you can do any of the following:
+Resizes image's width (while preserving original ratio) according to the queried preset and transforms it to the
+queried format, e.g. if you have the default settings and a *path/to/image.png* file inside */path/to/workdir/assets/img*,
+you can do any of the following:
 
 ```
 https://localhost:8080/img/lg/path/to/image.webp

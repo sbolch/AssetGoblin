@@ -58,7 +58,7 @@ func serve() {
 	mux := http.NewServeMux()
 
 	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
-		imageService := image.Service{Config: conf.Image}
+		imageService := image.Service{Config: &conf.Image}
 		mux.HandleFunc(conf.Image.Path, imageService.Serve)
 	} else {
 		log.Println("Warning: images are served as static files due to missing config.")
@@ -74,7 +74,7 @@ func serve() {
 	}
 
 	if conf.RateLimit.Limit > 0 {
-		ratelimitMiddleware := middleware.NewRateLimit(conf.RateLimit)
+		ratelimitMiddleware := middleware.NewRateLimit(&conf.RateLimit)
 		handler = ratelimitMiddleware.Limit(handler)
 	}
 
