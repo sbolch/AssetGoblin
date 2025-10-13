@@ -1,3 +1,6 @@
+// Package middleware provides HTTP middleware components for the application.
+// These middleware components can be used to add functionality like authentication,
+// rate limiting, and other request processing to the HTTP server.
 package middleware
 
 import (
@@ -7,17 +10,24 @@ import (
 	"time"
 )
 
+// RateLimit is a middleware that limits the number of requests from a single IP address.
+// It uses a map to track requests and their timestamps, with a mutex for thread safety.
 type RateLimit struct {
-	sync.Mutex
-	Config   *config.RateLimit
-	requests map[string]*requestCounter
+	sync.Mutex                            // Mutex for thread-safe access to the requests map
+	Config     *config.RateLimit          // Configuration for rate limiting
+	requests   map[string]*requestCounter // Map of IP addresses to request counters
 }
 
+// requestCounter tracks the number of requests and the timestamp of the last request
+// for a specific IP address.
 type requestCounter struct {
-	count       int
-	lastRequest time.Time
+	count       int       // Number of requests within the time window
+	lastRequest time.Time // Timestamp of the last request
 }
 
+// NewRateLimit creates a new RateLimit middleware with the given configuration.
+// It initializes the requests map and starts a background goroutine to clean up
+// expired entries from the map.
 func NewRateLimit(config *config.RateLimit) *RateLimit {
 	r := &RateLimit{
 		Config:   config,
@@ -29,6 +39,9 @@ func NewRateLimit(config *config.RateLimit) *RateLimit {
 	return r
 }
 
+// Limit returns a middleware handler that limits the number of requests from a single IP address.
+// It tracks requests by IP address and returns a 429 Too Many Requests response if the
+// limit is exceeded within the configured time window.
 func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		ip := req.RemoteAddr
@@ -55,6 +68,9 @@ func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 	})
 }
 
+// cleanup runs periodically to remove expired entries from the requests map.
+// It is started as a goroutine by NewRateLimit and runs every 'interval' duration.
+// This prevents the map from growing indefinitely with inactive IP addresses.
 func (r *RateLimit) cleanup(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

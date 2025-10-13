@@ -1,3 +1,5 @@
+// Package main provides version management functionality for the application.
+// This file contains functions for checking, downloading, and installing updates.
 package main
 
 import (
@@ -17,25 +19,35 @@ import (
 	"unicode"
 )
 
+// Version contains the current version of the application.
+// It is set to "development" by default and can be overridden during build.
 var Version = "development"
+
 var r *release
+
+// archMap maps Go architecture identifiers to the architecture names used in release files.
 var archMap = map[string]string{
 	"amd64": "x64",
 	"386":   "x86",
 	"arm64": "arm64",
 }
 
+// release represents a GitHub release with its assets and metadata.
 type release struct {
 	Assets  []releaseAsset `json:"assets"`
 	Body    string         `json:"body"`
 	TagName string         `json:"tag_name"`
 }
 
+// releaseAsset represents a downloadable asset from a GitHub release.
 type releaseAsset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Name               string `json:"name"`
 }
 
+// getLatestVersion fetches information about the latest release from GitHub
+// and returns the tag name (version) of that release.
+// It returns an error if the request fails or if the response cannot be parsed.
 func getLatestVersion() (string, error) {
 	res, err := http.Get("https://api.github.com/repos/sbolch/AssetGoblin/releases/latest")
 	if err != nil {
@@ -58,6 +70,10 @@ func getLatestVersion() (string, error) {
 	return r.TagName, nil
 }
 
+// update checks for and installs the latest version of the application.
+// It downloads the appropriate release for the current platform, verifies its checksum,
+// extracts it, and replaces the current executable with the updated version.
+// The function exits the application after completion, either with success or failure.
 func update() {
 	log.SetFlags(0)
 

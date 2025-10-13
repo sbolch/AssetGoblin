@@ -1,5 +1,8 @@
+// Package main provides information about the application.
 package main
 
+// Logo is an ASCII art representation of the AssetGoblin logo,
+// displayed when the application is run without arguments.
 const Logo = `
                           -  --- --  -                          
                         --- ---- --- ---                        

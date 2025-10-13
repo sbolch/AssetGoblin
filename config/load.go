@@ -1,3 +1,5 @@
+// Package config provides functionality for loading and managing application configuration.
+// It supports loading configuration from files and serializing/deserializing configuration data.
 package config
 
 import (
@@ -9,6 +11,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config represents the main application configuration.
+// It contains settings for the server, image processing, rate limiting, and security.
 type Config struct {
 	Image     Image     `mapstructure:"image"`
 	Port      string    `mapstructure:"port"`
@@ -17,6 +21,7 @@ type Config struct {
 	Secret    string    `mapstructure:"secret"`
 }
 
+// Image contains configuration for image processing and serving.
 type Image struct {
 	AvifThroughVips bool              `mapstructure:"avif_through_vips"`
 	CacheDir        string            `mapstructure:"cache_dir"`
@@ -26,11 +31,13 @@ type Image struct {
 	Presets         map[string]string `mapstructure:"presets"`
 }
 
+// RateLimit contains configuration for request rate limiting.
 type RateLimit struct {
 	Limit int           `mapstructure:"limit"`
 	Ttl   time.Duration `mapstructure:"ttl"`
 }
 
+// setDefaults sets default values for configuration parameters using Viper.
 func setDefaults() {
 	viper.SetDefault("port", "8080")
 	viper.SetDefault("public_dir", "public")
@@ -52,6 +59,11 @@ func setDefaults() {
 	viper.SetDefault("image.avif_through_vips", false)
 }
 
+// Load loads the configuration from a file or a previously saved gob file.
+// It first tries to load from a gob file for faster loading, and if that fails,
+// it falls back to loading from a config file using Viper.
+// After loading from a config file, it saves the configuration to a gob file for future use.
+// Returns an error if the configuration cannot be loaded.
 func (config *Config) Load() error {
 	setDefaults()
 
