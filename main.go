@@ -22,6 +22,7 @@ var conf config.Config
 func main() {
 	serveFlag := flag.Bool("serve", false, "Run the server")
 	versionFlag := flag.Bool("version", false, "Print version info")
+	flag.BoolVar(versionFlag, "v", false, "Print version info (shorthand)")
 	updateFlag := flag.Bool("update", false, "Update to latest version")
 	flag.Parse()
 

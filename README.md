@@ -129,7 +129,7 @@ Run the server
 
 Update to latest version
 
-### -version
+### -version | -v
 
 Print version info
 
