@@ -13,7 +13,11 @@ builds:
       - darwin
     ldflags:
       -X 'main.Version=v{{.Version}}'
+      -X 'main.BuildTime={{.Date}}'
+      -X 'main.GitCommit={{.ShortCommit}}'
     binary: assetgoblin{{ if eq .Os "windows" }}.exe{{ end }}
+    flags:
+      - -trimpath
 
 archives:
   - format: tar.gz

@@ -35,6 +35,7 @@ func main() {
 			fmt.Print(" (Update available: ", latest, ")")
 		}
 		fmt.Print("\n")
+		fmt.Printf("Build: %s #%s\n", BuildDate, GitCommit)
 		os.Exit(0)
 	} else if *updateFlag {
 		update()

@@ -23,6 +23,10 @@ import (
 // It is set to "development" by default and can be overridden during build.
 var Version = "development"
 
+// BuildDate and GitCommit are set during build time.
+var BuildDate = "unknown"
+var GitCommit = "unknown"
+
 var r *release
 
 // archMap maps Go architecture identifiers to the architecture names used in release files.

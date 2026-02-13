@@ -7,7 +7,7 @@ on:
       - "*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -25,6 +25,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick libvips-dev
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
       - name: Run tests
         run: |
           go test -v ./... -coverprofile=coverage
