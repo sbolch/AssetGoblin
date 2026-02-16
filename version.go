@@ -23,8 +23,8 @@ import (
 // It is set to "development" by default and can be overridden during build.
 var Version = "development"
 
-// BuildDate and GitCommit are set during build time.
-var BuildDate = "unknown"
+// BuildTime and GitCommit are set during build time.
+var BuildTime = "unknown"
 var GitCommit = "unknown"
 
 var r *release

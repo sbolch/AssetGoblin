@@ -35,13 +35,14 @@ func main() {
 			fmt.Print(" (Update available: ", latest, ")")
 		}
 		fmt.Print("\n")
-		fmt.Printf("Build: %s #%s\n", BuildDate, GitCommit)
+		fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 		os.Exit(0)
 	} else if *updateFlag {
 		update()
 	}
 
 	fmt.Println(Logo, "\nVersion:", Version)
+	fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 
 	fmt.Println("\nUsage:")
 	flag.PrintDefaults()
