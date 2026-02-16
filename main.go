@@ -29,25 +29,32 @@ func main() {
 	if *serveFlag {
 		serve()
 	} else if *versionFlag {
-		fmt.Print(Version)
+		fmt.Println(Version)
+		fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 		latest, _ := getLatestVersion()
 		if latest != Version {
-			fmt.Print(" (Update available: ", latest, ")")
+			fmt.Printf("\033[1;33mUpdate available: %s \033[0m\n", latest)
 		}
-		fmt.Print("\n")
-		fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 		os.Exit(0)
 	} else if *updateFlag {
 		update()
 	}
 
-	fmt.Println(Logo, "\nVersion:", Version)
-	fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
+	fmt.Println(Logo, "\nServe static files or dynamically manipulated images with ease")
+
+	latest, _ := getLatestVersion()
+	if latest != Version {
+		fmt.Println("\n\033[1;33m╔═════════════════════════════════╗\033[0m")
+		fmt.Printf("\033[1;33m  Update available: %s \033[0m\n", latest)
+		fmt.Println("\033[1;33m╚═════════════════════════════════╝\033[0m")
+	}
 
 	fmt.Println("\nUsage:")
 	flag.PrintDefaults()
 
 	fmt.Println("\nHomepage: https://github.com/sbolch/AssetGoblin")
+	fmt.Println("Version: ", Version)
+	fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 
 	os.Exit(0)
 }
