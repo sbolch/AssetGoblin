@@ -36,14 +36,25 @@ You only need to define the ones you want to override.
     },
     "path": "/img/",
     "directory": "assets/img",
-    "cache_dir": "cache",
+    "cache_dir": "<OS default cache>/assetgoblin/img",
     "avif_through_vips": false
   }
 }
 ```
+Config file lookup order:
+- Current working directory (`./config.*`)
+- Linux: `$XDG_CONFIG_HOME/assetgoblin` (usually `~/.config/assetgoblin`) and `/etc/assetgoblin`
+- macOS: `~/Library/Application Support/assetgoblin` and `/Library/Application Support/assetgoblin`
+- Windows: `%APPDATA%\\assetgoblin` and `%ProgramData%\\assetgoblin`
+
+If `image.cache_dir` is not set, AssetGoblin defaults to `<OS cache dir>/assetgoblin/img`:
+- Linux: `$XDG_CACHE_HOME/assetgoblin/img` (usually `~/.cache/assetgoblin/img`)
+- macOS: `~/Library/Caches/assetgoblin/img`
+- Windows: `%LocalAppData%\\assetgoblin\\img`
+
 > [!NOTE]
-> During its first run AssetGoblin encodes the config in [gob](https://pkg.go.dev/encoding/gob) format.
-> If you want to modify the configuration, edit your config file, then delete the gob file, so it can re-encode it.
+> For optimization, during its first run AssetGoblin encodes the config in [gob](https://pkg.go.dev/encoding/gob) format and stores it at `<OS cache dir>/assetgoblin/config.gob`.
+> If you modify the config file, delete the gob file (or run `-clear-gob`) so it can re-encode it.
 
 > [!NOTE]
 > Avif through vips is disabled by default because that encoding is really slow at the moment.
@@ -124,6 +135,14 @@ List flags
 ### -serve
 
 Run the server
+
+### -clear-gob
+
+Delete the cached gob config file from the OS default cache directory.
+
+### -config
+
+Print the effective config as a table, including the used config file location, whether it was loaded from gob cache, and the gob cache file path.
 
 ### -update
 

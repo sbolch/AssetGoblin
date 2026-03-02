@@ -39,6 +39,8 @@ func TestFlagParsing(t *testing.T) {
 		wantServe   bool
 		wantVersion bool
 		wantUpdate  bool
+		wantClear   bool
+		wantPrint   bool
 	}{
 		{
 			name:        "no flags",
@@ -46,6 +48,8 @@ func TestFlagParsing(t *testing.T) {
 			wantServe:   false,
 			wantVersion: false,
 			wantUpdate:  false,
+			wantClear:   false,
+			wantPrint:   false,
 		},
 		{
 			name:        "serve flag",
@@ -53,6 +57,8 @@ func TestFlagParsing(t *testing.T) {
 			wantServe:   true,
 			wantVersion: false,
 			wantUpdate:  false,
+			wantClear:   false,
+			wantPrint:   false,
 		},
 		{
 			name:        "version flag",
@@ -60,6 +66,8 @@ func TestFlagParsing(t *testing.T) {
 			wantServe:   false,
 			wantVersion: true,
 			wantUpdate:  false,
+			wantClear:   false,
+			wantPrint:   false,
 		},
 		{
 			name:        "update flag",
@@ -67,6 +75,26 @@ func TestFlagParsing(t *testing.T) {
 			wantServe:   false,
 			wantVersion: false,
 			wantUpdate:  true,
+			wantClear:   false,
+			wantPrint:   false,
+		},
+		{
+			name:        "clear gob flag",
+			args:        []string{"assetgoblin", "-clear-gob"},
+			wantServe:   false,
+			wantVersion: false,
+			wantUpdate:  false,
+			wantClear:   true,
+			wantPrint:   false,
+		},
+		{
+			name:        "print config flag",
+			args:        []string{"assetgoblin", "-print-config"},
+			wantServe:   false,
+			wantVersion: false,
+			wantUpdate:  false,
+			wantClear:   false,
+			wantPrint:   true,
 		},
 		{
 			name:        "multiple flags",
@@ -74,6 +102,8 @@ func TestFlagParsing(t *testing.T) {
 			wantServe:   true,
 			wantVersion: true,
 			wantUpdate:  false,
+			wantClear:   false,
+			wantPrint:   false,
 		},
 	}
 
@@ -84,6 +114,8 @@ func TestFlagParsing(t *testing.T) {
 			serveFlag := flag.Bool("serve", false, "Run the server")
 			versionFlag := flag.Bool("version", false, "Print version info")
 			updateFlag := flag.Bool("update", false, "Update to latest version")
+			clearGobFlag := flag.Bool("clear-gob", false, "Delete the cached gob config file")
+			printConfigFlag := flag.Bool("print-config", false, "Print effective config and config source info")
 
 			os.Args = tt.args
 			flag.Parse()
@@ -96,6 +128,12 @@ func TestFlagParsing(t *testing.T) {
 			}
 			if *updateFlag != tt.wantUpdate {
 				t.Errorf("updateFlag = %v, want %v", *updateFlag, tt.wantUpdate)
+			}
+			if *clearGobFlag != tt.wantClear {
+				t.Errorf("clearGobFlag = %v, want %v", *clearGobFlag, tt.wantClear)
+			}
+			if *printConfigFlag != tt.wantPrint {
+				t.Errorf("printConfigFlag = %v, want %v", *printConfigFlag, tt.wantPrint)
 			}
 		})
 	}

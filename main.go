@@ -4,14 +4,10 @@ package main
 
 import (
 	"assetgoblin/config"
-	"assetgoblin/image"
-	"assetgoblin/middleware"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
-	"path/filepath"
 )
 
 // conf holds the application configuration loaded from config files.
@@ -21,6 +17,8 @@ var conf config.Config
 // and executes the appropriate action based on the provided flags.
 func main() {
 	serveFlag := flag.Bool("serve", false, "Run the server")
+	clearGobFlag := flag.Bool("clear-gob", false, "Delete the cached gob config file")
+	printConfigFlag := flag.Bool("config", false, "Print effective config and config source info")
 	versionFlag := flag.Bool("version", false, "Print version info")
 	flag.BoolVar(versionFlag, "v", false, "Print version info (shorthand)")
 	updateFlag := flag.Bool("update", false, "Update to latest version")
@@ -28,6 +26,15 @@ func main() {
 
 	if *serveFlag {
 		serve()
+	} else if *printConfigFlag {
+		printConfig()
+		os.Exit(0)
+	} else if *clearGobFlag {
+		if err := config.RemoveGobFile(); err != nil {
+			log.Fatalf("Failed to delete gob config cache: %v", err)
+		}
+		fmt.Printf("Deleted gob config cache (if it existed): %s\n", config.GobFilePath())
+		os.Exit(0)
 	} else if *versionFlag {
 		fmt.Println(Version)
 		fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
@@ -57,46 +64,4 @@ func main() {
 	fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
 
 	os.Exit(0)
-}
-
-// serve starts the HTTP server with the configured handlers and middleware.
-// It loads the configuration, sets up routes for serving images and static files,
-// and applies middleware for security and rate limiting if configured.
-func serve() {
-	if err := conf.Load(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-
-	if conf.Port == "" {
-		log.Fatalf("Invalid port: %v", conf.Port)
-	}
-
-	wd, _ := os.Getwd()
-
-	mux := http.NewServeMux()
-
-	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
-		imageService := image.Service{Config: &conf.Image}
-		mux.HandleFunc(conf.Image.Path, imageService.Serve)
-	} else {
-		log.Println("Warning: images are served as static files due to missing config.")
-	}
-
-	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(wd, conf.PublicDir))))
-
-	var handler http.Handler = mux
-
-	if conf.Secret != "" {
-		signkeyMiddleware := middleware.Signkey{Secret: conf.Secret}
-		handler = signkeyMiddleware.Verify(handler)
-	}
-
-	if conf.RateLimit.Limit > 0 {
-		ratelimitMiddleware := middleware.NewRateLimit(&conf.RateLimit)
-		handler = ratelimitMiddleware.Limit(handler)
-	}
-
-	if err := http.ListenAndServe(":"+conf.Port, handler); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
-	}
 }

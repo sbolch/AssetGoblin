@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/viper"
@@ -14,11 +15,13 @@ import (
 // Config represents the main application configuration.
 // It contains settings for the server, image processing, rate limiting, and security.
 type Config struct {
-	Image     Image     `mapstructure:"image"`
-	Port      string    `mapstructure:"port"`
-	PublicDir string    `mapstructure:"public_dir"`
-	RateLimit RateLimit `mapstructure:"rate_limit"`
-	Secret    string    `mapstructure:"secret"`
+	Image          Image     `mapstructure:"image"`
+	Port           string    `mapstructure:"port"`
+	PublicDir      string    `mapstructure:"public_dir"`
+	RateLimit      RateLimit `mapstructure:"rate_limit"`
+	Secret         string    `mapstructure:"secret"`
+	UsedConfigFile string    `mapstructure:"-" json:"used_config_file"`
+	LoadedFromGob  bool      `mapstructure:"-" json:"loaded_from_gob"`
 }
 
 // Image contains configuration for image processing and serving.
@@ -55,7 +58,7 @@ func setDefaults() {
 	})
 	viper.SetDefault("image.path", "/img/")
 	viper.SetDefault("image.directory", "assets/img")
-	viper.SetDefault("image.cache_dir", "cache")
+	viper.SetDefault("image.cache_dir", filepath.Join(defaultCacheDir(), "img"))
 	viper.SetDefault("image.avif_through_vips", false)
 }
 
@@ -65,19 +68,28 @@ func setDefaults() {
 // After loading from a config file, it saves the configuration to a gob file for future use.
 // Returns an error if the configuration cannot be loaded.
 func (config *Config) Load() error {
+	viper.Reset()
 	setDefaults()
 
 	if err := config.loadGob(); err == nil {
+		config.LoadedFromGob = true
 		return nil
 	}
 
+	config.LoadedFromGob = false
 	viper.SetConfigName("config")
+	for _, configPath := range searchConfigPaths() {
+		viper.AddConfigPath(configPath)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
 			return fmt.Errorf("unable to read config file: %w", err)
 		}
+		config.UsedConfigFile = "none (defaults only)"
+	} else {
+		config.UsedConfigFile = viper.ConfigFileUsed()
 	}
 
 	if err := viper.Unmarshal(&config); err != nil {

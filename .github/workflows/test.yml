@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  test-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,17 +21,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: true
       - name: Install ImageMagick and libvips
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick libvips-dev
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
       - name: Run tests
         run: |
           go test -v ./... -coverprofile=coverage
@@ -39,5 +33,55 @@ jobs:
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-Linux
+          path: coverage.html
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      - name: Install ImageMagick and libvips
+        run: |
+          choco install -y imagemagick vips
+      - name: Run tests
+        run: |
+          go test -v ./... -coverprofile=coverage
+          go tool cover -html=coverage -o coverage.html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-Windows
+          path: coverage.html
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      - name: Install ImageMagick and libvips
+        run: |
+          brew install imagemagick vips
+      - name: Run tests
+        run: |
+          go test -v ./... -coverprofile=coverage
+          go tool cover -html=coverage -o coverage.html
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-macOS
           path: coverage.html

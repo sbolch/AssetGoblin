@@ -6,8 +6,10 @@ import (
 )
 
 func TestConfig_SaveGob(t *testing.T) {
-	_ = os.Remove("config.gob")
-	defer os.Remove("config.gob")
+	isolateConfigAndCacheEnv(t)
+
+	_ = RemoveGobFile()
+	defer RemoveGobFile()
 
 	cfg := &Config{
 		Port:      "9090",
@@ -20,14 +22,16 @@ func TestConfig_SaveGob(t *testing.T) {
 		t.Fatalf("saveGob() error = %v", err)
 	}
 
-	if _, err := os.Stat("config.gob"); os.IsNotExist(err) {
-		t.Errorf("saveGob() did not create config.gob file")
+	if _, err := os.Stat(GobFilePath()); os.IsNotExist(err) {
+		t.Errorf("saveGob() did not create gob file at %s", GobFilePath())
 	}
 }
 
 func TestConfig_LoadGob(t *testing.T) {
-	_ = os.Remove("config.gob")
-	defer os.Remove("config.gob")
+	isolateConfigAndCacheEnv(t)
+
+	_ = RemoveGobFile()
+	defer RemoveGobFile()
 
 	tests := []struct {
 		name     string
@@ -57,7 +61,7 @@ func TestConfig_LoadGob(t *testing.T) {
 					t.Fatalf("Setup failed: %v", err)
 				}
 			} else {
-				_ = os.Remove("config.gob")
+				_ = RemoveGobFile()
 			}
 
 			var loadedCfg Config
@@ -98,8 +102,10 @@ func TestCloseFile(t *testing.T) {
 }
 
 func TestConfig_SaveLoadGob_Integration(t *testing.T) {
-	_ = os.Remove("config.gob")
-	defer os.Remove("config.gob")
+	isolateConfigAndCacheEnv(t)
+
+	_ = RemoveGobFile()
+	defer RemoveGobFile()
 
 	originalCfg := &Config{
 		Port:      "9090",
@@ -182,5 +188,26 @@ func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 				t.Errorf("Image.Presets[%s] = %v, want %v", key, loadedCfg.Image.Presets[key], value)
 			}
 		}
+	}
+}
+
+func TestRemoveGobFile(t *testing.T) {
+	isolateConfigAndCacheEnv(t)
+
+	cfg := &Config{Port: "9090"}
+	if err := cfg.saveGob(); err != nil {
+		t.Fatalf("saveGob() error = %v", err)
+	}
+
+	if err := RemoveGobFile(); err != nil {
+		t.Fatalf("RemoveGobFile() error = %v", err)
+	}
+
+	if _, err := os.Stat(GobFilePath()); !os.IsNotExist(err) {
+		t.Fatalf("Expected gob file to be deleted, stat err: %v", err)
+	}
+
+	if err := RemoveGobFile(); err != nil {
+		t.Fatalf("RemoveGobFile() should not fail for missing file: %v", err)
 	}
 }

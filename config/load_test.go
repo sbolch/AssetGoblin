@@ -2,13 +2,38 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
 
+func isolateConfigAndCacheEnv(t *testing.T) {
+	t.Helper()
+
+	tempHome := t.TempDir()
+	tempConfig := t.TempDir()
+	tempCache := t.TempDir()
+	tempProgramData := t.TempDir()
+	tempAppData := t.TempDir()
+	tempLocalAppData := t.TempDir()
+
+	t.Setenv("HOME", tempHome)
+	t.Setenv("XDG_CONFIG_HOME", tempConfig)
+	t.Setenv("XDG_CACHE_HOME", tempCache)
+	t.Setenv("ProgramData", tempProgramData)
+	t.Setenv("APPDATA", tempAppData)
+	t.Setenv("LOCALAPPDATA", tempLocalAppData)
+}
+
 func TestConfig_Load(t *testing.T) {
-	_ = os.Remove("config.gob")
-	defer os.Remove("config.gob")
+	isolateConfigAndCacheEnv(t)
+
+	_ = RemoveGobFile()
+	defer func() {
+		err := RemoveGobFile()
+		if err != nil {
+		}
+	}()
 
 	tests := []struct {
 		name         string
@@ -52,11 +77,17 @@ func TestConfig_Load(t *testing.T) {
 				if cfg.Image.Directory != "assets/img" {
 					t.Errorf("Expected default image directory 'assets/img', got %s", cfg.Image.Directory)
 				}
-				if cfg.Image.CacheDir != "cache" {
-					t.Errorf("Expected default cache directory 'cache', got %s", cfg.Image.CacheDir)
+				if cfg.Image.CacheDir != filepath.Join(defaultCacheDir(), "img") {
+					t.Errorf("Expected default cache directory '%s', got %s", filepath.Join(defaultCacheDir(), "img"), cfg.Image.CacheDir)
 				}
 				if cfg.Image.AvifThroughVips != false {
 					t.Errorf("Expected default avif_through_vips false, got %v", cfg.Image.AvifThroughVips)
+				}
+				if cfg.UsedConfigFile != "none (defaults only)" {
+					t.Errorf("Expected used config file to be 'none (defaults only)', got %s", cfg.UsedConfigFile)
+				}
+				if cfg.LoadedFromGob {
+					t.Errorf("Expected LoadedFromGob false, got true")
 				}
 			},
 			cleanupFunc: func() error {
@@ -82,6 +113,7 @@ func TestConfig_Load(t *testing.T) {
 						Formats:         []string{"jpeg", "png"},
 						Presets:         map[string]string{"custom": "800"},
 					},
+					UsedConfigFile: "/tmp/test-config.yaml",
 				}
 				return cfg.saveGob()
 			},
@@ -120,9 +152,15 @@ func TestConfig_Load(t *testing.T) {
 				if !cfg.Image.AvifThroughVips {
 					t.Errorf("Expected avif_through_vips true, got %v", cfg.Image.AvifThroughVips)
 				}
+				if cfg.UsedConfigFile != "/tmp/test-config.yaml" {
+					t.Errorf("Expected used config file '/tmp/test-config.yaml', got %s", cfg.UsedConfigFile)
+				}
+				if !cfg.LoadedFromGob {
+					t.Errorf("Expected LoadedFromGob true, got false")
+				}
 			},
 			cleanupFunc: func() error {
-				return os.Remove("config.gob")
+				return RemoveGobFile()
 			},
 		},
 	}
@@ -158,6 +196,8 @@ func TestConfig_Load(t *testing.T) {
 }
 
 func TestSetDefaults(t *testing.T) {
+	isolateConfigAndCacheEnv(t)
+
 	setDefaults()
 
 	var cfg Config
@@ -192,10 +232,39 @@ func TestSetDefaults(t *testing.T) {
 	if cfg.Image.Directory != "assets/img" {
 		t.Errorf("Expected default image directory 'assets/img', got %s", cfg.Image.Directory)
 	}
-	if cfg.Image.CacheDir != "cache" {
-		t.Errorf("Expected default cache directory 'cache', got %s", cfg.Image.CacheDir)
+	if cfg.Image.CacheDir != filepath.Join(defaultCacheDir(), "img") {
+		t.Errorf("Expected default cache directory '%s', got %s", filepath.Join(defaultCacheDir(), "img"), cfg.Image.CacheDir)
 	}
 	if cfg.Image.AvifThroughVips != false {
 		t.Errorf("Expected default avif_through_vips false, got %v", cfg.Image.AvifThroughVips)
+	}
+}
+
+func TestConfigLoad_SetsUsedConfigFileFromDisk(t *testing.T) {
+	isolateConfigAndCacheEnv(t)
+	_ = RemoveGobFile()
+	defer RemoveGobFile()
+
+	workdir := t.TempDir()
+	t.Chdir(workdir)
+
+	configContent := []byte("port: \"9091\"\npublic_dir: \"from-file\"\n")
+	if err := os.WriteFile(filepath.Join(workdir, "config.yaml"), configContent, 0644); err != nil {
+		t.Fatalf("Failed to write config.yaml: %v", err)
+	}
+
+	var cfg Config
+	if err := cfg.Load(); err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.Port != "9091" {
+		t.Fatalf("Expected port 9091, got %s", cfg.Port)
+	}
+	if cfg.UsedConfigFile == "" || cfg.UsedConfigFile == "none (defaults only)" {
+		t.Fatalf("Expected UsedConfigFile to point to config file, got %q", cfg.UsedConfigFile)
+	}
+	if cfg.LoadedFromGob {
+		t.Fatalf("Expected LoadedFromGob false when loading from config file")
 	}
 }
