@@ -48,9 +48,9 @@ jobs:
         with:
           go-version: stable
           cache: true
-      - name: Install ImageMagick and libvips
+      - name: Install ImageMagick
         run: |
-          choco install -y imagemagick vips
+          choco install -y imagemagick
       - name: Run tests
         run: |
           go test -v ./... -coverprofile=coverage
