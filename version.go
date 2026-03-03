@@ -49,6 +49,8 @@ type releaseAsset struct {
 	Name               string `json:"name"`
 }
 
+// supportFilesDir returns the install location for non-binary files based on
+// the current executable path and platform conventions.
 func supportFilesDir(binaryPath string) string {
 	binDir := filepath.Dir(binaryPath)
 

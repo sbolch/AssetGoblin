@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestSearchConfigPaths verifies config search order includes cwd and user config dir.
 func TestSearchConfigPaths(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
@@ -36,6 +37,7 @@ func TestSearchConfigPaths(t *testing.T) {
 	}
 }
 
+// TestDefaultCacheDir verifies resolution of the default cache directory.
 func TestDefaultCacheDir(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 

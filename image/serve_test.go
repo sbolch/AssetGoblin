@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestService_Serve_PathValidation validates Serve behavior for malformed paths and inputs.
 func TestService_Serve_PathValidation(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
@@ -53,6 +54,7 @@ func TestService_Serve_PathValidation(t *testing.T) {
 	}
 }
 
+// TestService_Serve_FileNotFound verifies Serve returns 404 when source files are missing.
 func TestService_Serve_FileNotFound(t *testing.T) {
 	testDir := "testdata"
 	err := os.MkdirAll(testDir, 0755)
@@ -79,6 +81,7 @@ func TestService_Serve_FileNotFound(t *testing.T) {
 	}
 }
 
+// TestService_Serve_ValidRequest exercises Serve with a valid request path and source file.
 func TestService_Serve_ValidRequest(t *testing.T) {
 	if os.Getenv("CI") != "" {
 		t.Skip("Skipping test in CI environment")
@@ -114,6 +117,7 @@ func TestService_Serve_ValidRequest(t *testing.T) {
 	}
 }
 
+// TestService_Serve_FindImage verifies extension fallback lookup during Serve.
 func TestService_Serve_FindImage(t *testing.T) {
 	testDir := "testdata"
 	err := os.MkdirAll(testDir, 0755)
@@ -145,6 +149,7 @@ func TestService_Serve_FindImage(t *testing.T) {
 	}
 }
 
+// createTestImage creates a placeholder image file for Serve tests.
 func createTestImage(t *testing.T, path string) {
 	createEmptyFile(t, path)
 }

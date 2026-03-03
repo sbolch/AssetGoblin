@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// TestRateLimit_Limit verifies accepted, rejected, and reset request flows.
 func TestRateLimit_Limit(t *testing.T) {
 	tests := []struct {
 		name         string

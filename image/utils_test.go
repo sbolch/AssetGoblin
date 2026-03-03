@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestService_FindImage verifies extension-based discovery of source images.
 func TestService_FindImage(t *testing.T) {
 	testDir := "test_find_image"
 	err := os.MkdirAll(testDir, 0755)
@@ -75,6 +76,7 @@ func TestService_FindImage(t *testing.T) {
 	}
 }
 
+// TestService_IsValidFormat verifies format validation against configured extensions.
 func TestService_IsValidFormat(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -128,6 +130,7 @@ func TestService_IsValidFormat(t *testing.T) {
 	}
 }
 
+// createEmptyFile creates an empty file used as a test fixture.
 func createEmptyFile(t *testing.T, path string) {
 	file, err := os.Create(path)
 	if err != nil {

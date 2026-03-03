@@ -9,22 +9,26 @@ import (
 	"testing"
 )
 
+// TestServe_Skipped documents the intentionally skipped integration-style serve test.
 func TestServe_Skipped(t *testing.T) {
 	t.Skip("Skipping test because serve() starts an HTTP server that blocks")
 }
 
+// TestMainVersion verifies that the build-time version string is present.
 func TestMainVersion(t *testing.T) {
 	if Version == "" {
 		t.Error("Version is empty")
 	}
 }
 
+// TestLogo verifies that the startup logo constant is defined.
 func TestLogo(t *testing.T) {
 	if Logo == "" {
 		t.Error("Logo is empty")
 	}
 }
 
+// TestFlagParsing checks expected boolean parsing behavior for CLI flags.
 func TestFlagParsing(t *testing.T) {
 	oldArgs := os.Args
 	oldFlagCommandLine := flag.CommandLine
@@ -139,6 +143,7 @@ func TestFlagParsing(t *testing.T) {
 	}
 }
 
+// TestMainVersionOutput verifies that running main with -version prints Version.
 func TestMainVersionOutput(t *testing.T) {
 	if os.Getenv("TEST_MAIN_VERSION") == "1" {
 		oldArgs := os.Args
@@ -167,6 +172,7 @@ func TestMainVersionOutput(t *testing.T) {
 	}
 }
 
+// TestMainDefaultOutput documents a skipped default-output behavior test.
 func TestMainDefaultOutput(t *testing.T) {
 	t.Skip("Skipping test for default output as it's difficult to capture reliably")
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// isolateConfigAndCacheEnv sets per-test config/cache environment directories.
 func isolateConfigAndCacheEnv(t *testing.T) {
 	t.Helper()
 
@@ -25,15 +26,12 @@ func isolateConfigAndCacheEnv(t *testing.T) {
 	t.Setenv("LOCALAPPDATA", tempLocalAppData)
 }
 
+// TestConfig_Load verifies config loading from defaults and gob cache.
 func TestConfig_Load(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
 	_ = RemoveGobFile()
-	defer func() {
-		err := RemoveGobFile()
-		if err != nil {
-		}
-	}()
+	defer RemoveGobFile()
 
 	tests := []struct {
 		name         string
@@ -195,6 +193,7 @@ func TestConfig_Load(t *testing.T) {
 	}
 }
 
+// TestSetDefaults verifies baseline default values after loading configuration.
 func TestSetDefaults(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
@@ -240,6 +239,7 @@ func TestSetDefaults(t *testing.T) {
 	}
 }
 
+// TestConfigLoad_SetsUsedConfigFileFromDisk ensures disk-backed config metadata is set.
 func TestConfigLoad_SetsUsedConfigFileFromDisk(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 	_ = RemoveGobFile()

@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestSignkey_Verify validates request authorization for valid and invalid tokens.
 func TestSignkey_Verify(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -72,6 +73,7 @@ func TestSignkey_Verify(t *testing.T) {
 	}
 }
 
+// generateToken builds a deterministic HMAC token used by signkey tests.
 func generateToken(secret, path string) string {
 	hasher := hmac.New(sha256.New, []byte(secret))
 	hasher.Write([]byte(path))

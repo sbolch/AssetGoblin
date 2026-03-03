@@ -15,6 +15,7 @@ type mockTransport struct {
 	originalTransport http.RoundTripper
 }
 
+// RoundTrip redirects outbound requests to a local test server.
 func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	newReq, err := http.NewRequest(req.Method, m.server.URL, nil)
 	if err != nil {
@@ -24,6 +25,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.originalTransport.RoundTrip(newReq)
 }
 
+// TestGetLatestVersion verifies latest-release parsing and error handling.
 func TestGetLatestVersion(t *testing.T) {
 	originalTransport := http.DefaultTransport
 
@@ -102,6 +104,7 @@ func TestGetLatestVersion(t *testing.T) {
 	}
 }
 
+// TestArchMap verifies runtime architecture aliases used for release artifacts.
 func TestArchMap(t *testing.T) {
 	expectedMappings := map[string]string{
 		"amd64": "x64",
@@ -116,12 +119,14 @@ func TestArchMap(t *testing.T) {
 	}
 }
 
+// TestVersion ensures the version variable is not empty in tests.
 func TestVersion(t *testing.T) {
 	if Version == "" {
 		t.Error("Version is empty")
 	}
 }
 
+// TestGetOSName validates OS name normalization logic used by update naming.
 func TestGetOSName(t *testing.T) {
 	tests := []struct {
 		goos     string
@@ -163,6 +168,7 @@ func TestGetOSName(t *testing.T) {
 	}
 }
 
+// TestUpdateNameGeneration validates update archive name generation.
 func TestUpdateNameGeneration(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -220,6 +226,7 @@ func TestUpdateNameGeneration(t *testing.T) {
 	}
 }
 
+// TestFindUpdateURL verifies selection of an update asset URL by filename.
 func TestFindUpdateURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -278,6 +285,7 @@ func TestFindUpdateURL(t *testing.T) {
 	}
 }
 
+// TestFindChecksumURL verifies lookup of checksum asset URLs.
 func TestFindChecksumURL(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -333,6 +341,7 @@ func TestFindChecksumURL(t *testing.T) {
 	}
 }
 
+// TestParseChecksumFile verifies checksum parsing and invalid-line handling.
 func TestParseChecksumFile(t *testing.T) {
 	tests := []struct {
 		name         string

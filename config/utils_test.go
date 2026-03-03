@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestConfig_SaveGob verifies gob serialization writes a cache file.
 func TestConfig_SaveGob(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
@@ -27,6 +28,7 @@ func TestConfig_SaveGob(t *testing.T) {
 	}
 }
 
+// TestConfig_LoadGob verifies gob deserialization success and error paths.
 func TestConfig_LoadGob(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
@@ -86,6 +88,7 @@ func TestConfig_LoadGob(t *testing.T) {
 	}
 }
 
+// TestCloseFile verifies that closeFile closes file handles.
 func TestCloseFile(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test-close-file-*.txt")
 	if err != nil {
@@ -101,6 +104,7 @@ func TestCloseFile(t *testing.T) {
 	}
 }
 
+// TestConfig_SaveLoadGob_Integration verifies round-trip gob persistence.
 func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
@@ -191,6 +195,7 @@ func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 	}
 }
 
+// TestRemoveGobFile verifies gob cache deletion behavior for present and absent files.
 func TestRemoveGobFile(t *testing.T) {
 	isolateConfigAndCacheEnv(t)
 
