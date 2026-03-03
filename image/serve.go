@@ -22,6 +22,16 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 
 	wd, _ := os.Getwd()
 
+	imageDir := s.Config.Directory
+	if !filepath.IsAbs(imageDir) {
+		imageDir = filepath.Join(wd, imageDir)
+	}
+
+	cacheDir := s.Config.CacheDir
+	if !filepath.IsAbs(cacheDir) {
+		cacheDir = filepath.Join(wd, cacheDir)
+	}
+
 	splitPath := strings.Split(req.URL.Path, "/")
 	if len(splitPath) < 4 {
 		http.NotFound(res, req)
@@ -31,7 +41,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	presetName := splitPath[2]
 	path := strings.Join(splitPath[3:], "/")
 
-	requestedPath := filepath.Join(wd, s.Config.Directory, path)
+	requestedPath := filepath.Join(imageDir, path)
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
 	// Check if the requested format is valid
@@ -53,12 +63,15 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	finalPath := filepath.Join(
-		wd,
-		s.Config.CacheDir,
-		strings.TrimPrefix(strings.TrimSuffix(foundPath, filepath.Ext(foundPath)), filepath.Join(wd, s.Config.Directory)),
-		presetName+requestedExt,
-	)
+	sourceBasePath := strings.TrimSuffix(foundPath, filepath.Ext(foundPath))
+	relSourcePath, err := filepath.Rel(imageDir, sourceBasePath)
+	if err != nil {
+		log.Println("Error while resolving source path:", err)
+		http.Error(res, "Error while resolving source path", http.StatusInternalServerError)
+		return
+	}
+
+	finalPath := filepath.Join(cacheDir, relSourcePath, presetName+requestedExt)
 
 	// If cached version doesn't exist, generate, cache, and serve it
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {

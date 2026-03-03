@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -146,6 +147,47 @@ func TestService_Serve_FindImage(t *testing.T) {
 	status := rec.Result().StatusCode
 	if status != http.StatusOK && status != http.StatusInternalServerError {
 		t.Errorf("Serve() = %d, want either %d or %d", status, http.StatusOK, http.StatusInternalServerError)
+	}
+}
+
+// TestService_Serve_AbsoluteCacheDir verifies absolute cache directories are used as-is.
+func TestService_Serve_AbsoluteCacheDir(t *testing.T) {
+	testDir := t.TempDir()
+	cacheDir := filepath.Join(t.TempDir(), "img-cache")
+
+	jpgPath := filepath.Join(testDir, "test.jpg")
+	createEmptyFile(t, jpgPath)
+
+	service := &Service{
+		Config: &config.Image{
+			Directory: testDir,
+			Presets:   map[string]string{"thumbnail": "100"},
+			CacheDir:  cacheDir,
+			Formats:   []string{"jpg"},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/img/thumbnail/test.jpg", nil)
+	rec := httptest.NewRecorder()
+
+	service.Serve(rec, req)
+	status := rec.Result().StatusCode
+	if status != http.StatusOK && status != http.StatusInternalServerError {
+		t.Fatalf("Serve() = %d, want either %d or %d", status, http.StatusOK, http.StatusInternalServerError)
+	}
+
+	if _, err := os.Stat(filepath.Join(cacheDir, "test")); err != nil {
+		t.Fatalf("expected cache directory to be created inside absolute cache dir: %v", err)
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to resolve working directory: %v", err)
+	}
+
+	unexpectedPath := filepath.Join(wd, strings.TrimPrefix(cacheDir, string(filepath.Separator)))
+	if _, err = os.Stat(unexpectedPath); err == nil {
+		t.Fatalf("unexpected cwd-prefixed cache path created: %s", unexpectedPath)
 	}
 }
 
