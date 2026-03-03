@@ -49,6 +49,37 @@ type releaseAsset struct {
 	Name               string `json:"name"`
 }
 
+func supportFilesDir(binaryPath string) string {
+	binDir := filepath.Dir(binaryPath)
+
+	switch runtime.GOOS {
+	case "linux":
+		if binDir == "/usr/bin" {
+			return "/usr/share/assetgoblin"
+		}
+		if binDir == "/usr/local/bin" {
+			return "/usr/local/share/assetgoblin"
+		}
+	case "darwin":
+		if binDir == "/usr/local/bin" {
+			return "/usr/local/share/assetgoblin"
+		}
+		if binDir == "/opt/homebrew/bin" {
+			return "/opt/homebrew/share/assetgoblin"
+		}
+	case "windows":
+		programFiles := os.Getenv("ProgramFiles")
+		if programFiles == "" {
+			programFiles = `C:\Program Files`
+		}
+		if strings.EqualFold(binDir, filepath.Join(programFiles, "AssetGoblin")) {
+			return filepath.Join(programFiles, "AssetGoblin", "share")
+		}
+	}
+
+	return binDir
+}
+
 // getLatestVersion fetches information about the latest release from GitHub
 // and returns the tag name (version) of that release.
 // It returns an error if the request fails or if the response cannot be parsed.
@@ -229,6 +260,14 @@ func update() {
 	log.Println("Checksum verified.")
 
 	wd, _ := os.Getwd()
+	currentExecutablePath, err := os.Executable()
+	if err != nil {
+		currentExecutablePath = filepath.Join(wd, "assetgoblin")
+		if runtime.GOOS == "windows" {
+			currentExecutablePath += ".exe"
+		}
+	}
+	supportFilesDir := supportFilesDir(currentExecutablePath)
 
 	// Extract the update
 	switch runtime.GOOS {
@@ -263,9 +302,16 @@ func update() {
 				log.Fatalf("Failed to extract archive: %v", err)
 			}
 
-			filePath := filepath.Join(wd, header.Name)
+			if header.FileInfo().IsDir() {
+				continue
+			}
+
+			filePath := filepath.Join(supportFilesDir, header.Name)
 			if header.Name == "assetgoblin" {
 				filePath = filepath.Join(wd, "assetgoblin_"+latest)
+			}
+			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+				log.Fatalf("Failed to create file directory: %v", err)
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
@@ -294,9 +340,16 @@ func update() {
 		}(reader)
 
 		for _, file := range reader.File {
-			filePath := filepath.Join(wd, file.Name)
+			if file.FileInfo().IsDir() {
+				continue
+			}
+
+			filePath := filepath.Join(supportFilesDir, file.Name)
 			if file.Name == "assetgoblin.exe" {
 				filePath = filepath.Join(wd, "assetgoblin_"+latest+".exe")
+			}
+			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+				log.Fatalf("Failed to create file directory: %v", err)
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
