@@ -45,7 +45,7 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 - `config` - Configuration loading and management
 - `image` - Image processing and serving
 - `middleware` - HTTP middleware (rate limiting, authentication)
-- `utils` - Common utility functions (file/reader closing)
+- `utils` - Common utilities (file/reader closing) and ImagePreset struct
 - `main` - Entry point and CLI handling
 
 ### Logging
@@ -103,6 +103,8 @@ srv := &http.Server{
 - `config/load.go` - Configuration loading
 - `config/utils.go` - Configuration persistence utilities
 - `image/serve.go` - Image processing and serving
+- `image/utils.go` - Image utility functions
 - `middleware/ratelimit.go` - Rate limiting middleware
 - `middleware/signkey.go` - HMAC-based request verification
 - `utils/utils.go` - Common utilities (file/reader closing)
+- `utils/image_preset.go` - ImagePreset struct definition

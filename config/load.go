@@ -3,6 +3,7 @@
 package config
 
 import (
+	"assetgoblin/utils"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,12 +27,12 @@ type Config struct {
 
 // Image contains configuration for image processing and serving.
 type Image struct {
-	AvifThroughVips bool              `mapstructure:"avif_through_vips"`
-	CacheDir        string            `mapstructure:"cache_dir"`
-	Directory       string            `mapstructure:"directory"`
-	Formats         []string          `mapstructure:"formats"`
-	Path            string            `mapstructure:"path"`
-	Presets         map[string]string `mapstructure:"presets"`
+	AvifThroughVips bool                         `mapstructure:"avif_through_vips"`
+	CacheDir        string                       `mapstructure:"cache_dir"`
+	Directory       string                       `mapstructure:"directory"`
+	Formats         []string                     `mapstructure:"formats"`
+	Path            string                       `mapstructure:"path"`
+	Presets         map[string]utils.ImagePreset `mapstructure:"presets"`
 }
 
 // RateLimit contains configuration for request rate limiting.
@@ -50,12 +51,7 @@ func setDefaults() {
 	viper.SetDefault("rate_limit.ttl", "1m")
 
 	viper.SetDefault("image.formats", []string{"avif", "jpeg", "jpg", "png", "tiff", "webp"})
-	viper.SetDefault("image.presets", map[string]string{
-		"lg":   "960",
-		"lg2x": "1920",
-		"sm":   "640",
-		"sm2x": "1280",
-	})
+	viper.SetDefault("image.presets", map[string]utils.ImagePreset{})
 	viper.SetDefault("image.path", "/img/")
 	viper.SetDefault("image.directory", "assets/img")
 	viper.SetDefault("image.cache_dir", filepath.Join(defaultCacheDir(), "img"))
@@ -93,6 +89,10 @@ func (config *Config) Load() error {
 
 	if err := viper.Unmarshal(&config); err != nil {
 		return fmt.Errorf("unable to decode config file: %w", err)
+	}
+
+	if err := config.normalizePresets(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
 	}
 
 	if err := config.saveGob(); err != nil {

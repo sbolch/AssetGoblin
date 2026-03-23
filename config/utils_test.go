@@ -1,6 +1,7 @@
 package config
 
 import (
+	"assetgoblin/utils"
 	"os"
 	"testing"
 )
@@ -109,10 +110,10 @@ func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 			Directory:       "test-dir",
 			Formats:         []string{"jpg", "png", "webp"},
 			Path:            "/test-path/",
-			Presets: map[string]string{
-				"small":  "100",
-				"medium": "300",
-				"large":  "600",
+			Presets: map[string]utils.ImagePreset{
+				"small":  {Width: 100, Fit: "contain"},
+				"medium": {Width: 300, Fit: "contain"},
+				"large":  {Width: 600, Fit: "contain"},
 			},
 		},
 	}

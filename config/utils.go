@@ -64,3 +64,23 @@ func (config *Config) loadGob() error {
 
 	return nil
 }
+
+// normalizePresets normalizes presets by setting default Fit value and validates width.
+func (config *Config) normalizePresets() error {
+	if config.Image.Presets == nil {
+		return nil
+	}
+
+	normalized := make(map[string]utils.ImagePreset)
+	for name, p := range config.Image.Presets {
+		if p.Width <= 0 {
+			return fmt.Errorf("preset %q: width is required and must be greater than 0", name)
+		}
+		if p.Fit == "" {
+			p.Fit = "contain"
+		}
+		normalized[name] = p
+	}
+	config.Image.Presets = normalized
+	return nil
+}

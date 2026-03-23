@@ -48,8 +48,12 @@ func printConfig() {
 	}
 
 	presets := make([]string, 0, len(conf.Image.Presets))
-	for name, width := range conf.Image.Presets {
-		presets = append(presets, fmt.Sprintf("%s=%s", name, width))
+	for name, preset := range conf.Image.Presets {
+		if preset.Height > 0 {
+			presets = append(presets, fmt.Sprintf("%s=%dx%d", name, preset.Width, preset.Height))
+		} else {
+			presets = append(presets, fmt.Sprintf("%s=%d", name, preset.Width))
+		}
 	}
 	sort.Strings(presets)
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"assetgoblin/utils"
 	"os"
 	"path/filepath"
 	"testing"
@@ -66,8 +67,8 @@ func TestConfig_Load(t *testing.T) {
 				if len(cfg.Image.Formats) != 6 {
 					t.Errorf("Expected 6 default image formats, got %d", len(cfg.Image.Formats))
 				}
-				if len(cfg.Image.Presets) != 4 {
-					t.Errorf("Expected 4 default image presets, got %d", len(cfg.Image.Presets))
+				if len(cfg.Image.Presets) != 0 {
+					t.Errorf("Expected 0 default image presets, got %d", len(cfg.Image.Presets))
 				}
 				if cfg.Image.Path != "/img/" {
 					t.Errorf("Expected default image path '/img/', got %s", cfg.Image.Path)
@@ -109,7 +110,7 @@ func TestConfig_Load(t *testing.T) {
 						CacheDir:        "custom-cache",
 						AvifThroughVips: true,
 						Formats:         []string{"jpeg", "png"},
-						Presets:         map[string]string{"custom": "800"},
+						Presets:         map[string]utils.ImagePreset{"custom": {Width: 800, Fit: "contain"}},
 					},
 					UsedConfigFile: "/tmp/test-config.yaml",
 				}
@@ -222,8 +223,8 @@ func TestSetDefaults(t *testing.T) {
 	if len(cfg.Image.Formats) != 6 {
 		t.Errorf("Expected 6 default image formats, got %d", len(cfg.Image.Formats))
 	}
-	if len(cfg.Image.Presets) != 4 {
-		t.Errorf("Expected 4 default image presets, got %d", len(cfg.Image.Presets))
+	if len(cfg.Image.Presets) != 0 {
+		t.Errorf("Expected 0 default image presets, got %d", len(cfg.Image.Presets))
 	}
 	if cfg.Image.Path != "/img/" {
 		t.Errorf("Expected default image path '/img/', got %s", cfg.Image.Path)

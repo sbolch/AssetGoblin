@@ -28,12 +28,7 @@ You only need to define the ones you want to override.
   },
   "image": {
     "formats": ["avif", "jpeg", "jpg", "png", "tiff", "webp"],
-    "presets": {
-      "lg": "960",
-      "lg2x": "1920",
-      "sm": "640",
-      "sm2x": "1280"
-    },
+    "presets": {},
     "path": "/img/",
     "directory": "assets/img",
     "cache_dir": "<OS default cache>/assetgoblin/img",
@@ -41,6 +36,29 @@ You only need to define the ones you want to override.
   }
 }
 ```
+
+### Presets configuration
+
+Define custom presets in your config file:
+
+```json
+{
+  "image": {
+    "presets": {
+      "lg": {"width": 960},
+      "lg2x": {"width": 1920},
+      "sm": {"width": 640},
+      "sm2x": {"width": 1280},
+      "thumbnail": {"width": 200, "height": 200, "fit": "cover"}
+    }
+  }
+}
+```
+
+- `width` (required): Target width in pixels
+- `height` (optional): Target height in pixels. Use `0` for auto (preserves aspect ratio)
+- `fit` (optional): `contain` (default) or `cover`
+
 Config file lookup order:
 - Current working directory (`./config.*`)
 - Linux: `$XDG_CONFIG_HOME/assetgoblin` (usually `~/.config/assetgoblin`) and `/etc/assetgoblin`
@@ -66,14 +84,26 @@ If `image.cache_dir` is not set, AssetGoblin defaults to `<OS cache dir>/assetgo
 
 Resizes image's width (while preserving original ratio) according to the queried preset and transforms it to the
 queried format, e.g. if you have the default settings and a *path/to/image.png* file inside */path/to/workdir/assets/img*,
-you can do any of the following:
+you can use any of the following URL formats:
 
 ```
+# Preset-based (using configured presets)
 https://localhost:8080/img/lg/path/to/image.webp
 https://localhost:8080/img/lg2x/path/to/image.png
 https://localhost:8080/img/sm/path/to/image.jpg
 https://localhost:8080/img/sm2x/path/to/image.avif
+
+# Direct width (height auto-calculated to preserve aspect ratio)
+https://localhost:8080/img/640/path/to/image.jpg
+https://localhost:8080/img/1920/path/to/image.png
+
+# Direct width x height (with fit parameter)
+https://localhost:8080/img/640x480/path/to/image.jpg
+https://localhost:8080/img/800x600/path/to/image.png?fit=cover
 ```
+
+- `fit=contain` (default): Image is resized to fit within the dimensions while preserving aspect ratio
+- `fit=cover`: Image is resized to cover the entire dimensions, cropping excess (center-aligned)
 
 ### Static files
 

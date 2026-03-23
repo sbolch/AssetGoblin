@@ -2,6 +2,7 @@ package image
 
 import (
 	"assetgoblin/config"
+	"assetgoblin/utils"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,7 +16,7 @@ func TestService_Serve_PathValidation(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
 			Directory: "testdata",
-			Presets:   map[string]string{"thumbnail": "100"},
+			Presets:   map[string]utils.ImagePreset{"thumbnail": {Width: 100, Fit: "contain"}},
 			CacheDir:  "cache",
 			Formats:   []string{"jpg", "png"},
 		},
@@ -68,7 +69,7 @@ func TestService_Serve_FileNotFound(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
 			Directory: testDir,
-			Presets:   map[string]string{"thumbnail": "100"},
+			Presets:   map[string]utils.ImagePreset{"thumbnail": {Width: 100, Fit: "contain"}},
 			CacheDir:  "cache",
 			Formats:   []string{"jpg", "png"},
 		},
@@ -102,7 +103,7 @@ func TestService_Serve_ValidRequest(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
 			Directory: testDir,
-			Presets:   map[string]string{"thumbnail": "100"},
+			Presets:   map[string]utils.ImagePreset{"thumbnail": {Width: 100, Fit: "contain"}},
 			CacheDir:  "cache",
 			Formats:   []string{"jpg", "png"},
 		},
@@ -134,7 +135,7 @@ func TestService_Serve_FindImage(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
 			Directory: testDir,
-			Presets:   map[string]string{"thumbnail": "100"},
+			Presets:   map[string]utils.ImagePreset{"thumbnail": {Width: 100, Fit: "contain"}},
 			CacheDir:  "cache",
 			Formats:   []string{"jpg", "png"},
 		},
@@ -161,7 +162,7 @@ func TestService_Serve_AbsoluteCacheDir(t *testing.T) {
 	service := &Service{
 		Config: &config.Image{
 			Directory: testDir,
-			Presets:   map[string]string{"thumbnail": "100"},
+			Presets:   map[string]utils.ImagePreset{"thumbnail": {Width: 100, Fit: "contain"}},
 			CacheDir:  cacheDir,
 			Formats:   []string{"jpg"},
 		},
