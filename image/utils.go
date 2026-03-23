@@ -5,12 +5,14 @@ package image
 import (
 	"assetgoblin/config"
 	"os"
+	"slices"
+	"strings"
 )
 
 // Service handles image processing and serving operations.
 // It uses the configuration provided to determine how to process and serve images.
 type Service struct {
-	Config *config.Image // Configuration for image processing
+	Config *config.Image
 }
 
 // findImage searches for an image file with any of the supported formats.
@@ -28,13 +30,7 @@ func (s *Service) findImage(base string) (string, bool) {
 }
 
 // isValidFormat checks if the given format is supported by the service.
-// The format should include the leading dot (e.g., ".jpg").
 // Returns true if the format is supported, false otherwise.
 func (s *Service) isValidFormat(format string) bool {
-	for _, ext := range s.Config.Formats {
-		if format == "."+ext {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.Config.Formats, strings.TrimPrefix(format, "."))
 }

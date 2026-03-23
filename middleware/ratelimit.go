@@ -6,6 +6,7 @@ package middleware
 import (
 	"assetgoblin/config"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -13,24 +14,24 @@ import (
 // RateLimit is a middleware that limits the number of requests from a single IP address.
 // It uses a map to track requests and their timestamps, with a mutex for thread safety.
 type RateLimit struct {
-	sync.Mutex                            // Mutex for thread-safe access to the requests map
-	Config     *config.RateLimit          // Configuration for rate limiting
-	requests   map[string]*requestCounter // Map of IP addresses to request counters
+	sync.Mutex
+	Config   *config.RateLimit
+	requests map[string]*requestCounter
 }
 
 // requestCounter tracks the number of requests and the timestamp of the last request
 // for a specific IP address.
 type requestCounter struct {
-	count       int       // Number of requests within the time window
-	lastRequest time.Time // Timestamp of the last request
+	count       int
+	lastRequest time.Time
 }
 
 // NewRateLimit creates a new RateLimit middleware with the given configuration.
 // It initializes the requests map and starts a background goroutine to clean up
 // expired entries from the map.
-func NewRateLimit(config *config.RateLimit) *RateLimit {
+func NewRateLimit(cfg *config.RateLimit) *RateLimit {
 	r := &RateLimit{
-		Config:   config,
+		Config:   cfg,
 		requests: make(map[string]*requestCounter),
 	}
 
@@ -44,7 +45,7 @@ func NewRateLimit(config *config.RateLimit) *RateLimit {
 // limit is exceeded within the configured time window.
 func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		ip := req.RemoteAddr
+		ip := extractIP(req.RemoteAddr)
 
 		r.Lock()
 		defer r.Unlock()
@@ -84,4 +85,14 @@ func (r *RateLimit) cleanup(interval time.Duration) {
 		}
 		r.Unlock()
 	}
+}
+
+// extractIP extracts the IP address from a RemoteAddr string.
+// It handles both IPv4 and IPv6 formats with port numbers.
+func extractIP(addr string) string {
+	idx := strings.LastIndex(addr, ":")
+	if idx > 0 {
+		return addr[:idx]
+	}
+	return addr
 }

@@ -88,22 +88,6 @@ func TestConfig_LoadGob(t *testing.T) {
 	}
 }
 
-// TestCloseFile verifies that closeFile closes file handles.
-func TestCloseFile(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "test-close-file-*.txt")
-	if err != nil {
-		t.Fatalf("Failed to create temporary file: %v", err)
-	}
-	defer os.Remove(tmpFile.Name())
-
-	closeFile(tmpFile)
-
-	_, err = tmpFile.Write([]byte("test"))
-	if err == nil {
-		t.Errorf("Expected error writing to closed file, got nil")
-	}
-}
-
 // TestConfig_SaveLoadGob_Integration verifies round-trip gob persistence.
 func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 	isolateConfigAndCacheEnv(t)

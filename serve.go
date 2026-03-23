@@ -3,10 +3,11 @@ package main
 import (
 	"assetgoblin/image"
 	"assetgoblin/middleware"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // serve starts the HTTP server with the configured handlers and middleware.
@@ -14,11 +15,13 @@ import (
 // and applies middleware for security and rate limiting if configured.
 func serve() {
 	if err := conf.Load(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("Failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	if conf.Port == "" {
-		log.Fatalf("Invalid port: %v", conf.Port)
+		slog.Error("Invalid port", "port", conf.Port)
+		os.Exit(1)
 	}
 
 	wd, _ := os.Getwd()
@@ -29,7 +32,7 @@ func serve() {
 		imageService := image.Service{Config: &conf.Image}
 		mux.HandleFunc(conf.Image.Path, imageService.Serve)
 	} else {
-		log.Println("Warning: images are served as static files due to missing config.")
+		slog.Warn("Images are served as static files due to missing config")
 	}
 
 	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(wd, conf.PublicDir))))
@@ -46,7 +49,17 @@ func serve() {
 		handler = ratelimitMiddleware.Limit(handler)
 	}
 
-	if err := http.ListenAndServe(":"+conf.Port, handler); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	srv := &http.Server{
+		Addr:         ":" + conf.Port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	slog.Info("Starting server", "port", conf.Port)
+	if err := srv.ListenAndServe(); err != nil {
+		slog.Error("Server failed to start", "error", err)
+		os.Exit(1)
 	}
 }

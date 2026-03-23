@@ -10,21 +10,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"time"
 	"unicode"
+
+	"assetgoblin/utils"
 )
 
-// Version contains the current version of the application.
+// Version is the current version of the application.
 // It is set to "development" by default and can be overridden during build.
 var Version = "development"
 
-// BuildTime and GitCommit are set during build time.
+// BuildTime is the build timestamp.
+// It is set during build time.
 var BuildTime = "unknown"
+
+// GitCommit is the git commit hash.
+// It is set during build time.
 var GitCommit = "unknown"
 
 var r *release
@@ -86,15 +94,12 @@ func supportFilesDir(binaryPath string) string {
 // and returns the tag name (version) of that release.
 // It returns an error if the request fails or if the response cannot be parsed.
 func getLatestVersion() (string, error) {
-	res, err := http.Get("https://api.github.com/repos/sbolch/AssetGoblin/releases/latest")
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Get("https://api.github.com/repos/sbolch/AssetGoblin/releases/latest")
 	if err != nil {
 		return "", err
 	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Printf("Warning: %v\n", err)
-		}
-	}(res.Body)
+	defer utils.CloseReader(res.Body)
 
 	if res.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch releases: %s", res.Status)
@@ -112,25 +117,21 @@ func getLatestVersion() (string, error) {
 // extracts it, and replaces the current executable with the updated version.
 // The function exits the application after completion, either with success or failure.
 func update() {
-	log.SetFlags(0)
-
 	latest, err := getLatestVersion()
 	if err != nil {
-		log.Fatalf("Error getting the latest version: %v", err)
+		slog.Error("Error getting the latest version", "error", err)
+		os.Exit(1)
 	}
 
 	if latest == Version {
-		log.Println("Already up to date.")
+		fmt.Println("Already up to date.")
 		os.Exit(0)
 	}
 
-	log.Printf("Updating from %s to %s\n", Version, latest)
+	slog.Info("Updating", "from", Version, "to", latest)
 
-	// Get the name of the update for the current OS
-	var osName string
-	if runtime.GOOS == "darwin" {
-		osName = "macOS"
-	} else {
+	osName := "macOS"
+	if runtime.GOOS != "darwin" {
 		osR := []rune(runtime.GOOS)
 		osR[0] = unicode.ToUpper(osR[0])
 		osName = string(osR)
@@ -143,123 +144,107 @@ func update() {
 	}
 	updateName += ext
 
-	// Find the URL of the update
-	var updateURL string
-	for _, asset := range r.Assets {
-		if asset.Name == updateName {
-			updateURL = asset.BrowserDownloadURL
-			break
-		}
+	updateURLIdx := slices.IndexFunc(r.Assets, func(a releaseAsset) bool { return a.Name == updateName })
+	if updateURLIdx == -1 {
+		slog.Error("Failed to find update", "os", osName)
+		os.Exit(1)
 	}
-	if updateURL == "" {
-		log.Fatalf("Failed to find update for %s.", osName)
-	}
+	updateDownloadURL := r.Assets[updateURLIdx].BrowserDownloadURL
 
-	log.Println("Downloading updated archive...")
+	slog.Info("Downloading updated archive...")
 
-	// Download the update
-	res, err := http.Get(updateURL)
+	client := &http.Client{Timeout: 60 * time.Second}
+	res, err := client.Get(updateDownloadURL)
 	if err != nil {
-		log.Fatalf("Failed to download update: %v", err)
+		slog.Error("Failed to download update", "error", err)
+		os.Exit(1)
 	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Printf("Warning: %v\n", err)
-		}
-	}(res.Body)
+	defer utils.CloseReader(res.Body)
 
 	if res.StatusCode != http.StatusOK {
-		log.Fatalf("Failed to download update: %s", res.Status)
+		slog.Error("Failed to download update", "status", res.Status)
+		os.Exit(1)
 	}
 
 	tmpFile, err := os.CreateTemp("", "AssetGoblin-update-*")
 	if err != nil {
-		log.Fatalf("Failed to create temporary file: %v", err)
+		slog.Error("Failed to create temporary file", "error", err)
+		os.Exit(1)
 	}
-	defer func(name string) {
-		if err := os.Remove(name); err != nil {
-			log.Printf("Warning: %v\n", err)
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			slog.Warn("Failed to remove temp file", "error", err)
 		}
-	}(tmpFile.Name())
+	}()
 
 	_, err = io.Copy(tmpFile, res.Body)
 	if err != nil {
-		log.Fatalf("Failed to write temporary file: %v", err)
+		slog.Error("Failed to write temporary file", "error", err)
+		os.Exit(1)
 	}
 
-	err = tmpFile.Close()
+	utils.CloseFile(tmpFile)
+
+	slog.Info("Downloading checksum file...")
+
+	checksumURLIdx := slices.IndexFunc(r.Assets, func(a releaseAsset) bool { return strings.Contains(a.Name, "checksums") })
+	if checksumURLIdx == -1 {
+		slog.Error("Failed to verify update")
+		os.Exit(1)
+	}
+
+	res, err = client.Get(r.Assets[checksumURLIdx].BrowserDownloadURL)
 	if err != nil {
-		log.Fatalf("Failed to close temporary file: %v", err)
+		slog.Error("Failed to download checksum file", "error", err)
+		os.Exit(1)
 	}
-
-	// Download the checksum file
-	log.Println("Downloading checksum file...")
-
-	var checksumURL string
-	for _, asset := range r.Assets {
-		if strings.Contains(asset.Name, "checksums") {
-			checksumURL = asset.BrowserDownloadURL
-			break
-		}
-	}
-	if checksumURL == "" {
-		log.Fatal("Failed to verify update.")
-	}
-
-	res, err = http.Get(checksumURL)
-	if err != nil {
-		log.Fatalf("Failed to download checksum file: %v", err)
-	}
-	defer func(Body io.ReadCloser) {
-		if err := Body.Close(); err != nil {
-			log.Printf("Warning: %v\n", err)
-		}
-	}(res.Body)
+	defer utils.CloseReader(res.Body)
 
 	if res.StatusCode != http.StatusOK {
-		log.Fatalf("Failed to download checksum file: %s", res.Status)
+		slog.Error("Failed to download checksum file", "status", res.Status)
+		os.Exit(1)
 	}
 
 	checksums := make(map[string]string)
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatalf("Failed to read checksum file: %v", err)
+		slog.Error("Failed to read checksum file", "error", err)
+		os.Exit(1)
 	}
 	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
 	for _, line := range lines {
 		parts := strings.Fields(line)
 		if len(parts) != 2 {
-			continue // Skip invalid lines
+			continue
 		}
 		checksums[parts[1]] = parts[0]
 	}
 	checksum, ok := checksums[updateName]
 	if !ok {
-		log.Fatalf("Failed to find checksum for %s.", updateName)
+		slog.Error("Failed to find checksum", "file", updateName)
+		os.Exit(1)
 	}
 
-	// Verify checksum
 	file, err := os.Open(tmpFile.Name())
 	if err != nil {
-		log.Fatalf("Failed to open archive: %v", err)
+		slog.Error("Failed to open archive", "error", err)
+		os.Exit(1)
 	}
-	defer func(file *os.File) {
-		if err := file.Close(); err != nil {
-			log.Printf("Warning: %v\n", err)
-		}
-	}(file)
+	defer utils.CloseFile(file)
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
-		log.Fatalf("Failed to calculate checksum: %v", err)
+		slog.Error("Failed to calculate checksum", "error", err)
+		os.Exit(1)
 	}
 
 	calculatedChecksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	if calculatedChecksum != checksum {
-		log.Fatalf("Checksum mismatch: expected %s, got %s", checksum, calculatedChecksum)
+		slog.Error("Checksum mismatch", "expected", checksum, "got", calculatedChecksum)
+		os.Exit(1)
 	}
 
-	log.Println("Checksum verified.")
+	slog.Info("Checksum verified")
 
 	wd, _ := os.Getwd()
 	currentExecutablePath, err := os.Executable()
@@ -269,30 +254,23 @@ func update() {
 			currentExecutablePath += ".exe"
 		}
 	}
-	supportFilesDir := supportFilesDir(currentExecutablePath)
+	supportFilesPath := supportFilesDir(currentExecutablePath)
 
-	// Extract the update
 	switch runtime.GOOS {
 	case "darwin", "linux":
 		file, err := os.Open(tmpFile.Name())
 		if err != nil {
-			log.Fatalf("Failed to open archive: %v", err)
+			slog.Error("Failed to open archive", "error", err)
+			os.Exit(1)
 		}
-		defer func(file *os.File) {
-			if err := file.Close(); err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
-		}(file)
+		defer utils.CloseFile(file)
 
 		gz, err := gzip.NewReader(file)
 		if err != nil {
-			log.Fatalf("Failed to open archive: %v", err)
+			slog.Error("Failed to open archive", "error", err)
+			os.Exit(1)
 		}
-		defer func(gz *gzip.Reader) {
-			if err := gz.Close(); err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
-		}(gz)
+		defer gz.Close()
 
 		tr := tar.NewReader(gz)
 		for {
@@ -301,94 +279,80 @@ func update() {
 				break
 			}
 			if err != nil {
-				log.Fatalf("Failed to extract archive: %v", err)
+				slog.Error("Failed to extract archive", "error", err)
+				os.Exit(1)
 			}
 
 			if header.FileInfo().IsDir() {
 				continue
 			}
 
-			filePath := filepath.Join(supportFilesDir, header.Name)
+			filePath := filepath.Join(supportFilesPath, header.Name)
 			if header.Name == "assetgoblin" {
 				filePath = filepath.Join(wd, "assetgoblin_"+latest)
 			}
 			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-				log.Fatalf("Failed to create file directory: %v", err)
+				slog.Error("Failed to create file directory", "error", err)
+				os.Exit(1)
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
-				log.Fatalf("Failed to create file: %v", err)
+				slog.Error("Failed to create file", "error", err)
+				os.Exit(1)
 			}
 			if _, err := io.Copy(outFile, tr); err != nil {
-				if err := outFile.Close(); err != nil {
-					log.Printf("Warning: %v\n", err)
-				}
-				log.Fatalf("Failed to write file: %v", err)
+				utils.CloseFile(outFile)
+				slog.Error("Failed to write file", "error", err)
+				os.Exit(1)
 			}
-			err = outFile.Close()
-			if err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
+			utils.CloseFile(outFile)
 		}
 	case "windows":
 		reader, err := zip.OpenReader(tmpFile.Name())
 		if err != nil {
-			log.Fatalf("Failed to open archive: %v", err)
+			slog.Error("Failed to open archive", "error", err)
+			os.Exit(1)
 		}
-		defer func(reader *zip.ReadCloser) {
-			if err := reader.Close(); err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
-		}(reader)
+		defer reader.Close()
 
-		for _, file := range reader.File {
-			if file.FileInfo().IsDir() {
+		for _, zf := range reader.File {
+			if zf.FileInfo().IsDir() {
 				continue
 			}
 
-			filePath := filepath.Join(supportFilesDir, file.Name)
-			if file.Name == "assetgoblin.exe" {
+			filePath := filepath.Join(supportFilesPath, zf.Name)
+			if zf.Name == "assetgoblin.exe" {
 				filePath = filepath.Join(wd, "assetgoblin_"+latest+".exe")
 			}
 			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-				log.Fatalf("Failed to create file directory: %v", err)
+				slog.Error("Failed to create file directory", "error", err)
+				os.Exit(1)
 			}
 			outFile, err := os.Create(filePath)
 			if err != nil {
-				log.Fatalf("Failed to create file: %v", err)
+				slog.Error("Failed to create file", "error", err)
+				os.Exit(1)
 			}
-			rc, err := file.Open()
+			rc, err := zf.Open()
 			if err != nil {
-				if err := outFile.Close(); err != nil {
-					log.Printf("Warning: %v\n", err)
-				}
-				log.Fatalf("Failed to open file: %v", err)
+				utils.CloseFile(outFile)
+				slog.Error("Failed to open file", "error", err)
+				os.Exit(1)
 			}
 			if _, err := io.Copy(outFile, rc); err != nil {
-				err := outFile.Close()
-				if err != nil {
-					log.Printf("Warning: %v\n", err)
-				}
-				err = rc.Close()
-				if err != nil {
-					log.Printf("Warning: %v\n", err)
-				}
-				log.Fatalf("Failed to write file: %v", err)
+				utils.CloseFile(outFile)
+				utils.CloseReader(rc)
+				slog.Error("Failed to write file", "error", err)
+				os.Exit(1)
 			}
-			err = outFile.Close()
-			if err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
-			err = rc.Close()
-			if err != nil {
-				log.Printf("Warning: %v\n", err)
-			}
+			utils.CloseFile(outFile)
+			utils.CloseReader(rc)
 		}
 	default:
-		log.Fatalf("Unknown file extension: %s", ext)
+		slog.Error("Unknown file extension", "ext", ext)
+		os.Exit(1)
 	}
 
-	// Replace the current executable with the new one
 	currentExecutable := filepath.Join(wd, "assetgoblin")
 	backupExecutable := filepath.Join(wd, "assetgoblin_"+Version)
 	newExecutable := filepath.Join(wd, "assetgoblin_"+latest)
@@ -400,31 +364,30 @@ func update() {
 
 	err = os.Rename(currentExecutable, backupExecutable)
 	if err != nil {
-		log.Fatalf("Failed to backup current executable: %v", err)
+		slog.Error("Failed to backup current executable", "error", err)
+		os.Exit(1)
 	}
 
 	err = os.Rename(newExecutable, currentExecutable)
 	if err != nil {
-		log.Fatalf("Failed to replace current executable: %v", err)
+		slog.Error("Failed to replace current executable", "error", err)
+		os.Exit(1)
 	}
 
-	// Set the permissions on the new executable
 	if runtime.GOOS != "windows" {
 		if err := os.Chmod(currentExecutable, 0755); err != nil {
-			log.Fatalf("Failed to set permissions on new executable: %v", err)
+			slog.Error("Failed to set permissions on new executable", "error", err)
+			os.Exit(1)
 		}
 	}
 
-	// Remove the old executable
 	err = os.Remove(backupExecutable)
 	if err != nil {
-		log.Printf("Warning: %v\n", err)
+		slog.Warn("Failed to remove backup executable", "error", err)
 	}
 
-	log.Println("Update finished successfully.")
-
-	// Print the release notes
-	log.Println(r.Body)
+	slog.Info("Update finished successfully")
+	fmt.Println(r.Body)
 
 	os.Exit(0)
 }

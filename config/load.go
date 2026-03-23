@@ -5,7 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -83,8 +83,7 @@ func (config *Config) Load() error {
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if !errors.As(err, &configFileNotFoundError) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			return fmt.Errorf("unable to read config file: %w", err)
 		}
 		config.UsedConfigFile = "none (defaults only)"
@@ -97,7 +96,7 @@ func (config *Config) Load() error {
 	}
 
 	if err := config.saveGob(); err != nil {
-		log.Printf("Warning: %v\n", err)
+		slog.Warn("Failed to save gob file", "error", err)
 	}
 
 	return nil

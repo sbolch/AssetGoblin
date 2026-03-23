@@ -6,7 +6,7 @@ import (
 	"assetgoblin/config"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 )
 
@@ -31,7 +31,8 @@ func main() {
 		os.Exit(0)
 	} else if *clearGobFlag {
 		if err := config.RemoveGobFile(); err != nil {
-			log.Fatalf("Failed to delete gob config cache: %v", err)
+			slog.Error("Failed to delete gob config cache", "error", err)
+			os.Exit(1)
 		}
 		fmt.Printf("Deleted gob config cache (if it existed): %s\n", config.GobFilePath())
 		os.Exit(0)

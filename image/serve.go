@@ -3,12 +3,13 @@
 package image
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ import (
 // If the image is already cached, it serves the cached version directly.
 // The URL format should be: /[base_path]/[preset_name]/[image_path]
 func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
-	log.Println(req.Method, req.URL.Path, req.RemoteAddr, req.UserAgent())
+	slog.Info("Request received", "method", req.Method, "path", req.URL.Path, "remote", req.RemoteAddr, "user-agent", req.UserAgent())
 
 	wd, _ := os.Getwd()
 
@@ -44,8 +45,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	requestedPath := filepath.Join(imageDir, path)
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
-	// Check if the requested format is valid
-	if !s.isValidFormat(requestedExt) {
+	if !slices.Contains(s.Config.Formats, strings.TrimPrefix(requestedExt, ".")) {
 		http.Error(res, "Unsupported format: "+requestedExt, http.StatusBadRequest)
 		return
 	}
@@ -66,7 +66,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	sourceBasePath := strings.TrimSuffix(foundPath, filepath.Ext(foundPath))
 	relSourcePath, err := filepath.Rel(imageDir, sourceBasePath)
 	if err != nil {
-		log.Println("Error while resolving source path:", err)
+		slog.Error("Error while resolving source path", "error", err)
 		http.Error(res, "Error while resolving source path", http.StatusInternalServerError)
 		return
 	}
@@ -75,8 +75,8 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 
 	// If cached version doesn't exist, generate, cache, and serve it
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
-		if err = os.MkdirAll(filepath.Dir(finalPath), os.ModePerm); err != nil {
-			log.Println("Error while creating cache:", err)
+		if err = os.MkdirAll(filepath.Dir(finalPath), 0755); err != nil {
+			slog.Error("Error while creating cache", "error", err)
 			http.Error(res, "Error while creating cache", http.StatusInternalServerError)
 			return
 		}
@@ -95,7 +95,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 			}
 			cmd := exec.Command(prefix+"convert", foundPath, "-resize", presetValue, finalPath)
 			if err = cmd.Run(); err != nil {
-				log.Println("Error while converting image:", err)
+				slog.Error("Error while converting image", "error", err)
 				http.Error(res, "Error while converting image", http.StatusInternalServerError)
 				return
 			}

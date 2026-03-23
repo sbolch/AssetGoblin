@@ -100,7 +100,7 @@ func TestService_IsValidFormat(t *testing.T) {
 			name:    "format without dot",
 			formats: []string{"jpg", "png", "webp"},
 			format:  "jpg",
-			want:    false,
+			want:    true,
 		},
 		{
 			name:    "empty format",

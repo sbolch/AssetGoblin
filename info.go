@@ -4,7 +4,7 @@ package main
 import (
 	"assetgoblin/config"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -43,7 +43,8 @@ const Logo = `
 // printConfig loads and prints the effective runtime configuration as a table.
 func printConfig() {
 	if err := conf.Load(); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("Failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	presets := make([]string, 0, len(conf.Image.Presets))
@@ -74,6 +75,7 @@ func printConfig() {
 		fmt.Fprintf(w, "%s\t%s\n", row[0], row[1])
 	}
 	if err := w.Flush(); err != nil {
-		log.Fatalf("Failed to render config table: %v", err)
+		slog.Error("Failed to render config table", "error", err)
+		os.Exit(1)
 	}
 }

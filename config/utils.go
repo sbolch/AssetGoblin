@@ -1,20 +1,14 @@
-// Package config provides functionality for loading and managing application configuration.
 package config
 
 import (
 	"encoding/gob"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
-)
 
-// closeFile safely closes a file and logs any errors that occur.
-func closeFile(file *os.File) {
-	if err := file.Close(); err != nil {
-		log.Printf("Warning: %v\n", err)
-	}
-}
+	"assetgoblin/utils"
+)
 
 // GobFilePath returns the full path to the cached gob config file.
 func GobFilePath() string {
@@ -35,16 +29,16 @@ func RemoveGobFile() error {
 // If the file cannot be created, it logs a warning and returns nil to allow the application to continue.
 func (config *Config) saveGob() error {
 	if err := os.MkdirAll(defaultCacheDir(), 0755); err != nil {
-		log.Printf("Warning: %v\n", err)
+		slog.Warn("Failed to create cache directory", "error", err)
 		return nil
 	}
 
 	file, err := os.Create(GobFilePath())
 	if err != nil {
-		log.Printf("Warning: %v\n", err)
+		slog.Warn("Failed to create gob file", "error", err)
 		return nil
 	}
-	defer closeFile(file)
+	defer utils.CloseFile(file)
 
 	encoder := gob.NewEncoder(file)
 	if err = encoder.Encode(config); err != nil {
@@ -61,7 +55,7 @@ func (config *Config) loadGob() error {
 	if err != nil {
 		return fmt.Errorf("unable to open config file: %w", err)
 	}
-	defer closeFile(file)
+	defer utils.CloseFile(file)
 
 	decoder := gob.NewDecoder(file)
 	if err = decoder.Decode(config); err != nil {
