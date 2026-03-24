@@ -172,9 +172,16 @@ func TestConfig_SaveLoadGob_Integration(t *testing.T) {
 	if len(loadedCfg.Image.Presets) != len(originalCfg.Image.Presets) {
 		t.Errorf("Image.Presets length = %v, want %v", len(loadedCfg.Image.Presets), len(originalCfg.Image.Presets))
 	} else {
-		for key, value := range originalCfg.Image.Presets {
-			if loadedCfg.Image.Presets[key] != value {
-				t.Errorf("Image.Presets[%s] = %v, want %v", key, loadedCfg.Image.Presets[key], value)
+		for key, origValue := range originalCfg.Image.Presets {
+			loadedValue := loadedCfg.Image.Presets[key]
+			if loadedValue.Width != origValue.Width ||
+				loadedValue.Height != origValue.Height ||
+				loadedValue.Fit != origValue.Fit ||
+				loadedValue.Rotate != origValue.Rotate ||
+				loadedValue.Flip != origValue.Flip ||
+				loadedValue.Crop != origValue.Crop ||
+				len(loadedValue.Filters) != len(origValue.Filters) {
+				t.Errorf("Image.Presets[%s] = %v, want %v", key, loadedValue, origValue)
 			}
 		}
 	}

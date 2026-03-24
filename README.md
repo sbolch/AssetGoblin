@@ -49,7 +49,7 @@ Define custom presets in your config file:
       "lg2x": {"width": 1920},
       "sm": {"width": 640},
       "sm2x": {"width": 1280},
-      "thumbnail": {"width": 200, "height": 200, "fit": "cover"}
+      "thumbnail": {"width": 200, "height": 200, "fit": "cover", "rotate": 90, "flip": "horizontal", "filters": ["grayscale", "blur"]}
     }
   }
 }
@@ -58,6 +58,13 @@ Define custom presets in your config file:
 - `width` (required): Target width in pixels
 - `height` (optional): Target height in pixels. Use `0` for auto (preserves aspect ratio)
 - `fit` (optional): `contain` (default) or `cover`
+- `rotate` (optional): Rotation in degrees (0, 90, 180, 270)
+- `flip` (optional): `horizontal`, `vertical`, or `both`
+- `crop` (optional): Crop region (`top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, `bottom-right`)
+- `brightness` (optional): Brightness adjustment (-100 to 100)
+- `contrast` (optional): Contrast adjustment (-100 to 100)
+- `gamma` (optional): Gamma adjustment (0.1 to 10.0)
+- `filters` (optional): Array of filters to apply in order (`grayscale`, `sepia`, `blur`, `sharpen`, `negate`, `normalize`, `equalize`, `contrast`, `edge`, `emboss`, `charcoal`, `solarize`, `paint`, `oil`, `sketch`, `vignette`)
 
 Config file lookup order:
 - Current working directory (`./config.*`)
@@ -104,6 +111,29 @@ https://localhost:8080/img/800x600/path/to/image.png?fit=cover
 
 - `fit=contain` (default): Image is resized to fit within the dimensions while preserving aspect ratio
 - `fit=cover`: Image is resized to cover the entire dimensions, cropping excess (center-aligned)
+- `rotate`: Rotation in degrees (0, 90, 180, 270)
+- `flip`: Flip image (`horizontal`, `vertical`, `both`)
+- `crop`: Crop region (`top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, `bottom-right`)
+- `brightness`: Brightness adjustment (-100 to 100)
+- `contrast`: Contrast adjustment (-100 to 100)
+- `gamma`: Gamma adjustment (0.1 to 10.0)
+- `filter`: Apply filter (comma-separated: `?filter=grayscale,blur`)
+  - `grayscale`: Convert to grayscale
+  - `sepia`: Apply sepia tone
+  - `blur`: Apply blur
+  - `sharpen`: Sharpen image
+  - `negate`, `invert`: Invert colors
+  - `normalize`: Normalize image levels
+  - `equalize`: Histogram equalization
+  - `contrast`: Increase contrast
+  - `edge`: Detect edges
+  - `emboss`: Emboss effect
+  - `charcoal`: Charcoal drawing effect
+  - `solarize`: Solarize effect
+  - `paint`: Oil painting effect
+  - `oil`: Oil painting effect (stronger)
+  - `sketch`: Sketch effect
+  - `vignette`: Vignette effect
 
 ### Static files
 

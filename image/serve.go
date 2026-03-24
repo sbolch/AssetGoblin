@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -21,11 +22,12 @@ const (
 
 // Serve handles HTTP requests for images, processing them according to the requested preset.
 // It extracts the preset name and image path from the URL, finds the image file,
-// resizes it according to the preset, caches the result, and serves it to the client.
+// resizes it according to the preset with optional transforms (rotate, flip, brightness, contrast, gamma, filters),
+// caches the result, and serves it to the client.
 // If the image is already cached, it serves the cached version directly.
 // The URL format should be: /[base_path]/[preset_name]/[image_path]
 // Alternatively, direct dimensions can be used: /[base_path]/[width]/[image_path] or /[base_path]/[width]x[height]/[image_path]
-// When width x height is given, use fit=cover or fit=contain query parameter to determine resizing behavior.
+// Query parameters: fit, rotate, flip, crop, brightness, contrast, gamma, filter
 func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	slog.Info("Request received", "method", req.Method, "path", req.URL.Path, "remote", req.RemoteAddr, "user-agent", req.UserAgent())
 
@@ -40,7 +42,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	presetOrDim := splitPath[2]
+	presetOrSizes := splitPath[2]
 	path := strings.Join(splitPath[3:], "/")
 
 	requestedPath := filepath.Join(imageDir, path)
@@ -52,10 +54,85 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	}
 
 	queryFit := req.URL.Query().Get("fit")
-	resizeOption, sizeParts, isPreset := parseSize(presetOrDim, queryFit, s.Config.Presets)
+	queryRotate := req.URL.Query().Get("rotate")
+	queryFlip := req.URL.Query().Get("flip")
+	queryCrop := req.URL.Query().Get("crop")
+
+	resizeOption, sizeParts, isPreset := parseSize(presetOrSizes, queryFit, s.Config.Presets)
 	if resizeOption == "" && !isPreset {
-		http.Error(res, "Unsupported preset or size: "+presetOrDim, http.StatusBadRequest)
+		http.Error(res, "Unsupported preset or size: "+presetOrSizes, http.StatusBadRequest)
 		return
+	}
+
+	if queryRotate != "" {
+		r, err := strconv.Atoi(queryRotate)
+		if err == nil && (r == 0 || r == 90 || r == 180 || r == 270) {
+			sizeParts.rotate = r
+		}
+	}
+	if queryFlip != "" {
+		if queryFlip == "horizontal" || queryFlip == "vertical" || queryFlip == "both" {
+			sizeParts.flip = queryFlip
+		}
+	}
+	if queryCrop != "" {
+		validCrops := map[string]bool{
+			"top-left":     true,
+			"top":          true,
+			"top-right":    true,
+			"left":         true,
+			"center":       true,
+			"right":        true,
+			"bottom-left":  true,
+			"bottom":       true,
+			"bottom-right": true,
+		}
+		if validCrops[queryCrop] {
+			sizeParts.crop = queryCrop
+		}
+	}
+	queryBrightness := req.URL.Query().Get("brightness")
+	queryContrast := req.URL.Query().Get("contrast")
+	queryGamma := req.URL.Query().Get("gamma")
+	filterStr := req.URL.Query().Get("filter")
+
+	if b, err := strconv.ParseFloat(queryBrightness, 64); err == nil && b >= -100 && b <= 100 {
+		sizeParts.brightness = b
+	}
+	if c, err := strconv.ParseFloat(queryContrast, 64); err == nil && c >= -100 && c <= 100 {
+		sizeParts.contrast = c
+	}
+	if g, err := strconv.ParseFloat(queryGamma, 64); err == nil && g >= 0.1 && g <= 10.0 {
+		sizeParts.gamma = g
+	}
+
+	if filterStr != "" {
+		queryFilters := strings.Split(filterStr, ",")
+		validFilters := map[string]bool{
+			"grayscale": true,
+			"sepia":     true,
+			"blur":      true,
+			"sharpen":   true,
+			"negate":    true,
+			"invert":    true,
+			"normalize": true,
+			"equalize":  true,
+			"contrast":  true,
+			"edge":      true,
+			"emboss":    true,
+			"charcoal":  true,
+			"solarize":  true,
+			"paint":     true,
+			"oil":       true,
+			"sketch":    true,
+			"vignette":  true,
+		}
+		for _, f := range queryFilters {
+			f = strings.TrimSpace(f)
+			if validFilters[f] {
+				sizeParts.filters = append(sizeParts.filters, f)
+			}
+		}
 	}
 
 	foundPath, found := s.findImage(strings.TrimSuffix(requestedPath, requestedExt))
@@ -72,9 +149,30 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cacheKey := presetOrDim
+	cacheKey := presetOrSizes
 	if sizeParts.hasSize {
-		cacheKey = presetOrDim + "_" + string(sizeParts.fit)
+		cacheKey = presetOrSizes + "_" + string(sizeParts.fit)
+	}
+	if sizeParts.rotate > 0 {
+		cacheKey += "_r" + strconv.Itoa(sizeParts.rotate)
+	}
+	if sizeParts.flip != "" {
+		cacheKey += "_f" + sizeParts.flip
+	}
+	if sizeParts.brightness != 0 {
+		cacheKey += "_b" + strconv.FormatFloat(sizeParts.brightness, 'f', -1, 64)
+	}
+	if sizeParts.contrast != 0 {
+		cacheKey += "_c" + strconv.FormatFloat(sizeParts.contrast, 'f', -1, 64)
+	}
+	if sizeParts.gamma > 0 && sizeParts.gamma != 1.0 {
+		cacheKey += "_g" + strconv.FormatFloat(sizeParts.gamma, 'f', -1, 64)
+	}
+	if len(sizeParts.filters) > 0 {
+		cacheKey += "_" + strings.Join(sizeParts.filters, ",")
+	}
+	if sizeParts.crop != "" {
+		cacheKey += "_crop" + sizeParts.crop
 	}
 
 	finalPath := filepath.Join(cacheDir, relSourcePath, cacheKey+requestedExt)

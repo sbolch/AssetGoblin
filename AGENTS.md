@@ -107,4 +107,4 @@ srv := &http.Server{
 - `middleware/ratelimit.go` - Rate limiting middleware
 - `middleware/signkey.go` - HMAC-based request verification
 - `utils/utils.go` - Common utilities (file/reader closing)
-- `utils/image_preset.go` - ImagePreset struct definition
+- `utils/image.go` - ImagePreset struct definition
