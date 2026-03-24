@@ -127,6 +127,7 @@ func parseSize(presetOrSize, queryFit string, presets map[string]utils.ImagePres
 	return strconv.Itoa(width), sizeParts{width: width, hasSize: false}, false
 }
 
+// buildVipsCommand builds a libvips command for image processing.
 func buildVipsCommand(input, output string, resizeOption string, parts sizeParts) *exec.Cmd {
 	if !parts.hasSize && parts.rotate == 0 && parts.flip == "" && len(parts.filters) == 0 {
 		return exec.Command("vips", "copy", input, output)
@@ -163,6 +164,7 @@ func buildVipsCommand(input, output string, resizeOption string, parts sizeParts
 	return exec.Command("vips", "copy", input, output)
 }
 
+// addVipsTransforms adds image transformation operations to a vips command.
 func addVipsTransforms(cmd *exec.Cmd, input, output string, parts sizeParts) *exec.Cmd {
 	// Brightness/Contrast adjustments
 	if parts.brightness != 0 || parts.contrast != 0 {
@@ -246,6 +248,7 @@ func addVipsTransforms(cmd *exec.Cmd, input, output string, parts sizeParts) *ex
 	return cmd
 }
 
+// buildConvertCommand builds an ImageMagick convert command for image processing.
 func buildConvertCommand(prefix, input, output string, resizeOption string, parts sizeParts) *exec.Cmd {
 	args := []string{}
 
@@ -319,6 +322,7 @@ func buildConvertCommand(prefix, input, output string, resizeOption string, part
 	return exec.Command(prefix+"convert", args...)
 }
 
+// ensureAbsolute converts a relative path to an absolute path using the working directory.
 func ensureAbsolute(path, wd string) string {
 	if filepath.IsAbs(path) {
 		return path
