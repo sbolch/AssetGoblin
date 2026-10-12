@@ -20,15 +20,24 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: true
       - name: Install ImageMagick and libvips
         run: |
           sudo apt-get update
-          sudo apt-get install -y imagemagick libvips-dev
+          sudo apt-get install -y imagemagick libvips-dev ffmpeg
+      - name: Build QOA reference converter
+        run: |
+          mkdir -p "$RUNNER_TEMP/qoa-tool"
+          cd "$RUNNER_TEMP/qoa-tool"
+          curl -fsSLO https://raw.githubusercontent.com/phoboslab/qoa/bc0589710ff6aa2f50e08fb4d0a815d567bc0f3e/qoa.h
+          curl -fsSLO https://raw.githubusercontent.com/phoboslab/qoa/bc0589710ff6aa2f50e08fb4d0a815d567bc0f3e/qoaconv.c
+          cc qoaconv.c -std=gnu99 -O3 -lm -o qoaconv
+          echo "$RUNNER_TEMP/qoa-tool" >> "$GITHUB_PATH"
       - name: Run tests
         run: |
-          go test -v ./... -coverprofile=coverage
+          go vet ./...
+          go test -race -v ./... -coverprofile=coverage
           go tool cover -html=coverage -o coverage.html
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -46,14 +55,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: true
       - name: Install ImageMagick
         run: |
-          choco install -y imagemagick
+          choco install -y imagemagick ffmpeg
       - name: Run tests
         run: |
-          go test -v ./... -coverprofile=coverage
+          go vet ./...
+          go test -race -v ./... -coverprofile=coverage
           go tool cover -html=coverage -o coverage.html
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -71,14 +81,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: true
       - name: Install ImageMagick and libvips
         run: |
-          brew install imagemagick vips
+          brew install imagemagick vips ffmpeg
       - name: Run tests
         run: |
-          go test -v ./... -coverprofile=coverage
+          go vet ./...
+          go test -race -v ./... -coverprofile=coverage
           go tool cover -html=coverage -o coverage.html
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

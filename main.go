@@ -13,15 +13,30 @@ import (
 // conf holds the application configuration loaded from config files.
 var conf config.Config
 
+var pluginsDir string
+
+// lookupBool returns the value of a named bool flag after flag.Parse.
+// It works even when the flag was registered by a dependency.
+func lookupBool(name string) bool {
+	f := flag.Lookup(name)
+	if f == nil {
+		return false
+	}
+	return f.Value.(flag.Getter).Get().(bool)
+}
+
 // main is the entry point of the application. It parses command-line flags
 // and executes the appropriate action based on the provided flags.
 func main() {
+	flag.StringVar(&pluginsDir, "plugins-dir", "", "Load Lua plugins from this directory (default: beside executable)")
 	serveFlag := flag.Bool("serve", false, "Run the server")
 	clearGobFlag := flag.Bool("clear-gob", false, "Delete the cached gob config file")
 	printConfigFlag := flag.Bool("config", false, "Print effective config and config source info")
 	versionFlag := flag.Bool("version", false, "Print version info")
 	flag.BoolVar(versionFlag, "v", false, "Print version info (shorthand)")
-	updateFlag := flag.Bool("update", false, "Update to latest version")
+	if flag.Lookup("update") == nil {
+		flag.Bool("update", false, "Update to latest version")
+	}
 	flag.Parse()
 
 	if *serveFlag {
@@ -44,7 +59,7 @@ func main() {
 			fmt.Printf("\033[1;33mUpdate available: %s\033[0m\n", latest)
 		}
 		os.Exit(0)
-	} else if *updateFlag {
+	} else if lookupBool("update") {
 		update()
 	}
 

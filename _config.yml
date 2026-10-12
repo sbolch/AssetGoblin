@@ -1,0 +1,55 @@
+title: AssetGoblin
+description: Static assets, image transformations and portable Lua plugins.
+url: https://sbolch.github.io
+baseurl: /AssetGoblin
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+color_scheme: light
+repository: sbolch/AssetGoblin
+footer_content: ""
+search_enabled: true
+heading_anchors: true
+search:
+  heading_level: 3
+  button: true
+aux_links:
+  GitHub: https://github.com/sbolch/AssetGoblin
+  Releases: https://github.com/sbolch/AssetGoblin/releases
+gh_edit_link: true
+gh_edit_repository: https://github.com/sbolch/AssetGoblin
+gh_edit_branch: main
+gh_edit_view_mode: edit
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-seo-tag
+  - jekyll-github-metadata
+  - jekyll-include-cache
+  - jekyll-sitemap
+relative_links:
+  enabled: true
+  collections: false
+exclude:
+  - AGENTS.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - config
+  - image
+  - middleware
+  - utils
+  - plugin/
+  - public
+  - features
+  - dist
+  - runtime-plugins
+  - '*.go'
+  - go.mod
+  - go.sum
+  - '*.lua'
+  - assetgoblin
+  - assetgoblin.exe
+  - coverage
+  - coverage.html
+  - config.*
+  - LICENSE
+  - scripts

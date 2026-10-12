@@ -1,64 +1,111 @@
 package main
 
 import (
+	"assetgoblin/config"
 	"assetgoblin/image"
 	"assetgoblin/middleware"
+	"assetgoblin/plugin"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/go-fuego/fuego"
 )
 
-// serve starts the HTTP server with the configured handlers and middleware.
-// It loads the configuration, sets up routes for serving images and static files,
-// and applies middleware for security and rate limiting if configured.
+// newServer builds the production server without opening a listener.
+func newServer(cfg *config.Config, pluginHandlers ...plugin.RouteHandler) (*fuego.Server, error) {
+	return newServerWithCodecs(cfg, nil, pluginHandlers...)
+}
+
+func newServerWithCodecs(cfg *config.Config, codecs map[string]image.Codec, pluginHandlers ...plugin.RouteHandler) (*fuego.Server, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("working directory: %w", err)
+	}
+	srv := fuego.NewServer(
+		fuego.WithAddr(":"+cfg.Port),
+		fuego.WithoutLogger(),
+		fuego.WithoutStartupMessages(),
+		fuego.WithEngineOptions(fuego.WithOpenAPIConfig(fuego.OpenAPIConfig{Disabled: true, DisableLocalSave: true})),
+	)
+	srv.ReadTimeout = 15 * time.Second
+	srv.ReadHeaderTimeout = 5 * time.Second
+	srv.WriteTimeout = 15 * time.Second
+	srv.IdleTimeout = 60 * time.Second
+	paths := map[string]bool{"/": true}
+	register := func(path string, handler http.HandlerFunc) error {
+		decoded, err := url.PathUnescape(path)
+		if err != nil || decoded != path || pathpkg.Clean(path)+"/" != path || !strings.HasPrefix(path, "/") || !strings.HasSuffix(path, "/") || strings.ContainsAny(path, "{} \t\n") || paths[path] {
+			return fmt.Errorf("invalid or duplicate route path %q", path)
+		}
+		paths[path] = true
+		fuego.GetStd(srv, path, handler, fuego.OptionHide())
+		return nil
+	}
+	if len(cfg.Image.Formats) > 0 {
+		service := &image.Service{Config: &cfg.Image, Codecs: codecs}
+		if err := register(cfg.Image.Path, service.Serve); err != nil {
+			return nil, err
+		}
+	}
+	for _, plugin := range pluginHandlers {
+		if err := register(plugin.Path(), plugin.Handler()); err != nil {
+			return nil, err
+		}
+	}
+	publicDir := cfg.PublicDir
+	if !filepath.IsAbs(publicDir) {
+		publicDir = filepath.Join(wd, publicDir)
+	}
+	fuego.GetStd(srv, "/", http.FileServer(http.Dir(publicDir)).ServeHTTP, fuego.OptionHide())
+	var middlewares []func(http.Handler) http.Handler
+	if cfg.Secret != "" {
+		middlewares = append(middlewares, (&middleware.Signkey{Secret: cfg.Secret}).Verify)
+	}
+	if cfg.RateLimit.Limit > 0 {
+		middlewares = append(middlewares, middleware.NewRateLimit(&cfg.RateLimit).Limit)
+	}
+	fuego.WithGlobalMiddlewares(middlewares...)(srv)
+	// Apply Fuego's global middleware order to the handler used by tests too.
+	srv.Handler = srv.Mux
+	for _, wrap := range middlewares {
+		srv.Handler = wrap(srv.Handler)
+	}
+
+	return srv, nil
+}
+
+// serve loads configuration and starts the Fuego HTTP server.
 func serve() {
 	if err := conf.Load(); err != nil {
 		slog.Error("Failed to load config", "error", err)
 		os.Exit(1)
 	}
-
 	if conf.Port == "" {
 		slog.Error("Invalid port", "port", conf.Port)
 		os.Exit(1)
 	}
-
-	wd, _ := os.Getwd()
-
-	mux := http.NewServeMux()
-
-	if len(conf.Image.Formats) > 0 && len(conf.Image.Presets) > 0 {
-		imageService := image.Service{Config: &conf.Image}
-		mux.HandleFunc(conf.Image.Path, imageService.Serve)
-	} else {
-		slog.Warn("Images are served as static files due to missing config")
+	manager, err := loadPlugins(pluginsDir)
+	if err != nil {
+		slog.Error("Failed to load plugins", "error", err)
+		os.Exit(1)
 	}
-
-	mux.Handle("/", http.FileServer(http.Dir(filepath.Join(wd, conf.PublicDir))))
-
-	var handler http.Handler = mux
-
-	if conf.Secret != "" {
-		signkeyMiddleware := middleware.Signkey{Secret: conf.Secret}
-		handler = signkeyMiddleware.Verify(handler)
+	defer manager.Close()
+	srv, err := newServerWithCodecs(&conf, manager.ImageCodecs(), manager.Handlers()...)
+	if err != nil {
+		slog.Error("Failed to configure server", "error", err)
+		os.Exit(1)
 	}
-
-	if conf.RateLimit.Limit > 0 {
-		ratelimitMiddleware := middleware.NewRateLimit(&conf.RateLimit)
-		handler = ratelimitMiddleware.Limit(handler)
-	}
-
-	srv := &http.Server{
-		Addr:         ":" + conf.Port,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
 	slog.Info("Starting server", "port", conf.Port)
-	if err := srv.ListenAndServe(); err != nil {
+	// Fuego applies the same middleware chain when starting the listener.
+	if err := srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("Server failed to start", "error", err)
 		os.Exit(1)
 	}

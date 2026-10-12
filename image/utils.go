@@ -18,6 +18,7 @@ import (
 // It uses the configuration provided to determine how to process and serve images.
 type Service struct {
 	Config *config.Image
+	Codecs map[string]Codec
 }
 
 // findImage searches for an image file with any of the supported formats.
@@ -25,9 +26,16 @@ type Service struct {
 // each of the supported extensions. Returns the full path of the found image and true
 // if an image is found, or an empty string and false otherwise.
 func (s *Service) findImage(base string) (string, bool) {
-	for _, ext := range s.Config.Formats {
+	formats := append([]string(nil), s.Config.Formats...)
+	extra := []string{}
+	for name := range s.Codecs {
+		extra = append(extra, name)
+	}
+	slices.Sort(extra)
+	formats = append(formats, extra...)
+	for _, ext := range formats {
 		path := base + "." + ext
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
 			return path, true
 		}
 	}
@@ -84,7 +92,7 @@ func parseSize(presetOrSize, queryFit string, presets map[string]utils.ImagePres
 			brightness: preset.Brightness,
 			contrast:   preset.Contrast,
 			gamma:      preset.Gamma,
-			filters:    preset.Filters,
+			filters:    slices.Clone(preset.Filters),
 		}
 		return resizeOption, parts, true
 	}
@@ -124,7 +132,7 @@ func parseSize(presetOrSize, queryFit string, presets map[string]utils.ImagePres
 		return "", sizeParts{}, false
 	}
 
-	return strconv.Itoa(width), sizeParts{width: width, hasSize: false}, false
+	return strconv.Itoa(width), sizeParts{width: width, hasSize: true, fit: FitModeContain}, false
 }
 
 // buildVipsCommand builds a libvips command for image processing.
@@ -319,6 +327,9 @@ func buildConvertCommand(prefix, input, output string, resizeOption string, part
 
 	args = append(args, output)
 
+	if strings.TrimSpace(prefix) == "magick" {
+		return exec.Command("magick", append([]string{"convert"}, args...)...)
+	}
 	return exec.Command(prefix+"convert", args...)
 }
 

@@ -5,8 +5,8 @@ package middleware
 
 import (
 	"assetgoblin/config"
+	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -15,8 +15,9 @@ import (
 // It uses a map to track requests and their timestamps, with a mutex for thread safety.
 type RateLimit struct {
 	sync.Mutex
-	Config   *config.RateLimit
-	requests map[string]*requestCounter
+	Config      *config.RateLimit
+	requests    map[string]*requestCounter
+	nextCleanup time.Time
 }
 
 // requestCounter tracks the number of requests and the timestamp of the last request
@@ -27,15 +28,12 @@ type requestCounter struct {
 }
 
 // NewRateLimit creates a new RateLimit middleware with the given configuration.
-// It initializes the requests map and starts a background goroutine to clean up
-// expired entries from the map.
+// Expired entries are pruned periodically on requests, without a background goroutine.
 func NewRateLimit(cfg *config.RateLimit) *RateLimit {
 	r := &RateLimit{
 		Config:   cfg,
 		requests: make(map[string]*requestCounter),
 	}
-
-	go r.cleanup(5 * time.Minute)
 
 	return r
 }
@@ -48,11 +46,20 @@ func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 		ip := extractIP(req.RemoteAddr)
 
 		r.Lock()
-		defer r.Unlock()
+		now := time.Now()
+		if !now.Before(r.nextCleanup) {
+			for ip, client := range r.requests {
+				if now.Sub(client.lastRequest) > r.Config.Ttl {
+					delete(r.requests, ip)
+				}
+			}
+			r.nextCleanup = now.Add(5 * time.Minute)
+		}
 
 		if client, found := r.requests[ip]; found {
-			if time.Since(client.lastRequest) < r.Config.Ttl {
+			if now.Sub(client.lastRequest) < r.Config.Ttl {
 				if client.count >= r.Config.Limit {
+					r.Unlock()
 					http.Error(res, "Rate limit exceeded", http.StatusTooManyRequests)
 					return
 				}
@@ -60,39 +67,22 @@ func (r *RateLimit) Limit(handler http.Handler) http.Handler {
 			} else {
 				client.count = 1
 			}
-			client.lastRequest = time.Now()
+			client.lastRequest = now
 		} else {
-			r.requests[ip] = &requestCounter{count: 1, lastRequest: time.Now()}
+			r.requests[ip] = &requestCounter{count: 1, lastRequest: now}
 		}
 
+		r.Unlock()
 		handler.ServeHTTP(res, req)
 	})
-}
-
-// cleanup runs periodically to remove expired entries from the requests map.
-// It is started as a goroutine by NewRateLimit and runs every 'interval' duration.
-// This prevents the map from growing indefinitely with inactive IP addresses.
-func (r *RateLimit) cleanup(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		r.Lock()
-		for ip, client := range r.requests {
-			if time.Since(client.lastRequest) > r.Config.Ttl {
-				delete(r.requests, ip)
-			}
-		}
-		r.Unlock()
-	}
 }
 
 // extractIP extracts the IP address from a RemoteAddr string.
 // It handles both IPv4 and IPv6 formats with port numbers.
 func extractIP(addr string) string {
-	idx := strings.LastIndex(addr, ":")
-	if idx > 0 {
-		return addr[:idx]
+	host, _, err := net.SplitHostPort(addr)
+	if err == nil {
+		return host
 	}
 	return addr
 }

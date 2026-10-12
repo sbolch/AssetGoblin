@@ -36,6 +36,10 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 
 ## Key Dependencies
 
+- Go 1.27.2 or newer
+- FFmpeg on PATH for optional audio/video transformations
+- `github.com/go-fuego/fuego` - HTTP server and routing
+- `github.com/yuin/gopher-lua` - Portable startup-loaded Lua plugins
 - `github.com/spf13/viper` - Configuration management
 
 ## Code Architecture
@@ -46,6 +50,7 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 - `image` - Image processing and serving
 - `middleware` - HTTP middleware (rate limiting, authentication)
 - `utils` - Common utilities (file/reader closing) and ImagePreset struct
+- `plugin` - Lua plugin discovery, request callbacks, generic process execution and file serving
 - `main` - Entry point and CLI handling
 
 ### Logging
@@ -60,7 +65,15 @@ slog.Warn("Failed to save gob file", "error", err)
 
 ### HTTP Server
 
-Uses `http.Server` with timeouts configured:
+Uses Fuego with standard HTTP handlers and explicit timeouts. `newServer` is shared
+by production and server tests. OpenAPI output is disabled. Runtime plugins are
+`assetgoblin-*.lua` files beside the executable, loaded only when serving starts.
+`-plugins-dir` overrides discovery (needed for `go run`). Examples and their
+documentation live in `plugins/{audio,video,qoi,qoa}` and distribute
+Lua files independently; there are no build tags or local module
+replacements. Run `go test ./... -race` when changing plugin integration.
+
+The embedded `http.Server` has timeouts configured:
 
 ```go
 srv := &http.Server{
@@ -74,7 +87,21 @@ srv := &http.Server{
 
 ### Testing
 
-- Tests use standard Go testing package
+Core process tests use an arbitrary text-processing tool. Example Lua scripts are
+responsible for audio/video formats, validation, codecs, FFmpeg arguments and filters.
+Keep the host application-neutral: it provides file staging, declared-tool execution,
+size/deadline limits, caching and HTTP responses. Tools run with the server user's
+permissions; deploy trusted plugins. FFmpeg enables example integration tests;
+QOA additionally needs `qoaconv`.
+Image codecs bridge through PNG to reuse core presets and transforms. Plugin
+`extends` dependencies compose parent manifests in the leaf interpreter; only
+leaves register routes/codecs. Process pipelines share one deadline.
+
+- Use `features/**/*.feature` for checks wherever feasible, including parsing,
+  validation, caching, concurrency and lifecycle behavior. Scenario outlines hold
+  inputs and expected outcomes; Go functions implement setup, actions and assertions.
+  Ordinary Go test functions should be suite runners or subprocess fixtures.
+- Tests run through the standard Go testing package
 - Use `t.Helper()` for helper functions
 - Use table-driven tests where appropriate
 - Isolate tests that require environment variables using `t.Setenv()`
@@ -99,6 +126,10 @@ srv := &http.Server{
 
 - `main.go` - Entry point with CLI flag parsing
 - `serve.go` - HTTP server setup
+- `plugin.go` - Executable-relative plugin discovery
+- `plugin/load.go` - Lua interpreter setup and plugin API validation
+- `plugin/serve.go` - Lua callbacks and root-scoped file serving
+- `plugin/process.go` - Generic plugin-defined tool execution and caching
 - `version.go` - Version management and auto-update
 - `config/load.go` - Configuration loading
 - `config/utils.go` - Configuration persistence utilities
@@ -108,3 +139,14 @@ srv := &http.Server{
 - `middleware/signkey.go` - HMAC-based request verification
 - `utils/utils.go` - Common utilities (file/reader closing)
 - `utils/image.go` - ImagePreset struct definition
+
+### Documentation
+
+`README.md` is the overview; `docs/` holds the canonical configuration, image,
+security, CLI, plugin API and development references. Example plugin READMEs contain
+plugin-specific behavior and link to shared deployment/media parameters in their
+catalog. Avoid copying host limits or API details into examples.
+GitHub Pages renders these same Markdown sources with the pinned Just the Docs
+Jekyll theme; `_config.yml` controls navigation/search and source exclusions.
+The documentation workflow validates PR builds and deploys `main`. Keep relative
+Markdown links valid both in GitHub and through `jekyll-relative-links`.

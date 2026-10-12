@@ -130,26 +130,13 @@ func update() {
 
 	slog.Info("Updating", "from", Version, "to", latest)
 
-	osName := "macOS"
-	if runtime.GOOS != "darwin" {
-		osR := []rune(runtime.GOOS)
-		osR[0] = unicode.ToUpper(osR[0])
-		osName = string(osR)
-	}
+	updateName := releaseArchiveName(latest, runtime.GOOS, runtime.GOARCH)
 
-	updateName := fmt.Sprintf("AssetGoblin_%s_%s_%s", latest, osName, archMap[runtime.GOARCH])
-	ext := ".tar.gz"
-	if runtime.GOOS == "windows" {
-		ext = ".zip"
-	}
-	updateName += ext
-
-	updateURLIdx := slices.IndexFunc(r.Assets, func(a releaseAsset) bool { return a.Name == updateName })
-	if updateURLIdx == -1 {
-		slog.Error("Failed to find update", "os", osName)
+	updateDownloadURL, found := findUpdateURL(r.Assets, updateName)
+	if !found {
+		slog.Error("Failed to find update", "os", runtime.GOOS)
 		os.Exit(1)
 	}
-	updateDownloadURL := r.Assets[updateURLIdx].BrowserDownloadURL
 
 	slog.Info("Downloading updated archive...")
 
@@ -187,13 +174,12 @@ func update() {
 
 	slog.Info("Downloading checksum file...")
 
-	checksumURLIdx := slices.IndexFunc(r.Assets, func(a releaseAsset) bool { return strings.Contains(a.Name, "checksums") })
-	if checksumURLIdx == -1 {
+	checksumURL, found := findChecksumURL(r.Assets)
+	if !found {
 		slog.Error("Failed to verify update")
 		os.Exit(1)
 	}
-
-	res, err = client.Get(r.Assets[checksumURLIdx].BrowserDownloadURL)
+	res, err = client.Get(checksumURL)
 	if err != nil {
 		slog.Error("Failed to download checksum file", "error", err)
 		os.Exit(1)
@@ -205,20 +191,13 @@ func update() {
 		os.Exit(1)
 	}
 
-	checksums := make(map[string]string)
+	var checksums map[string]string
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		slog.Error("Failed to read checksum file", "error", err)
 		os.Exit(1)
 	}
-	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
-	for _, line := range lines {
-		parts := strings.Fields(line)
-		if len(parts) != 2 {
-			continue
-		}
-		checksums[parts[1]] = parts[0]
-	}
+	checksums = parseChecksums(string(body))
 	checksum, ok := checksums[updateName]
 	if !ok {
 		slog.Error("Failed to find checksum", "file", updateName)
@@ -349,7 +328,7 @@ func update() {
 			utils.CloseReader(rc)
 		}
 	default:
-		slog.Error("Unknown file extension", "ext", ext)
+		slog.Error("Unknown file extension", "file", updateName)
 		os.Exit(1)
 	}
 
@@ -390,4 +369,51 @@ func update() {
 	fmt.Println(r.Body)
 
 	os.Exit(0)
+}
+
+// releaseArchiveName selects the platform naming convention used by releases.
+func releaseArchiveName(version, goos, goarch string) string {
+	osName := "macOS"
+	if goos != "darwin" {
+		chars := []rune(goos)
+		if len(chars) > 0 {
+			chars[0] = unicode.ToUpper(chars[0])
+		}
+		osName = string(chars)
+	}
+	extension := ".tar.gz"
+	if goos == "windows" {
+		extension = ".zip"
+	}
+	return fmt.Sprintf("AssetGoblin_%s_%s_%s%s", version, osName, archMap[goarch], extension)
+}
+
+// parseChecksums ignores malformed lines and indexes checksums by archive name.
+func parseChecksums(data string) map[string]string {
+	checksums := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(data), "\n") {
+		parts := strings.Fields(line)
+		if len(parts) == 2 {
+			checksums[parts[1]] = parts[0]
+		}
+	}
+	return checksums
+}
+
+// findUpdateURL selects the exact archive requested by the updater.
+func findUpdateURL(assets []releaseAsset, name string) (string, bool) {
+	index := slices.IndexFunc(assets, func(asset releaseAsset) bool { return asset.Name == name })
+	if index < 0 {
+		return "", false
+	}
+	return assets[index].BrowserDownloadURL, true
+}
+
+// findChecksumURL selects the checksum document using the release naming convention.
+func findChecksumURL(assets []releaseAsset) (string, bool) {
+	index := slices.IndexFunc(assets, func(asset releaseAsset) bool { return strings.Contains(asset.Name, "checksums") })
+	if index < 0 {
+		return "", false
+	}
+	return assets[index].BrowserDownloadURL, true
 }

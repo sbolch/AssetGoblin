@@ -3,6 +3,8 @@
 package image
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,27 +38,31 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	imageDir := ensureAbsolute(s.Config.Directory, wd)
 	cacheDir := ensureAbsolute(s.Config.CacheDir, wd)
 
-	splitPath := strings.Split(req.URL.Path, "/")
-	if len(splitPath) < 4 {
+	prefix := s.Config.Path
+	if prefix == "" {
+		prefix = "/img/"
+	}
+	relative, ok := strings.CutPrefix(req.URL.Path, prefix)
+	presetOrSizes, path, hasPath := strings.Cut(relative, "/")
+	if !ok || !hasPath || presetOrSizes == "" || !filepath.IsLocal(path) {
 		http.NotFound(res, req)
 		return
 	}
-
-	presetOrSizes := splitPath[2]
-	path := strings.Join(splitPath[3:], "/")
-
 	requestedPath := filepath.Join(imageDir, path)
+
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
-	if !slices.Contains(s.Config.Formats, strings.TrimPrefix(requestedExt, ".")) {
+	outputCodec := s.Codecs[strings.TrimPrefix(requestedExt, ".")]
+	if outputCodec == nil && !slices.Contains(s.Config.Formats, strings.TrimPrefix(requestedExt, ".")) {
 		http.Error(res, "Unsupported format: "+requestedExt, http.StatusBadRequest)
 		return
 	}
 
-	queryFit := req.URL.Query().Get("fit")
-	queryRotate := req.URL.Query().Get("rotate")
-	queryFlip := req.URL.Query().Get("flip")
-	queryCrop := req.URL.Query().Get("crop")
+	query := req.URL.Query()
+	queryFit := query.Get("fit")
+	queryRotate := query.Get("rotate")
+	queryFlip := query.Get("flip")
+	queryCrop := query.Get("crop")
 
 	resizeOption, sizeParts, isPreset := parseSize(presetOrSizes, queryFit, s.Config.Presets)
 	if resizeOption == "" && !isPreset {
@@ -91,10 +97,10 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 			sizeParts.crop = queryCrop
 		}
 	}
-	queryBrightness := req.URL.Query().Get("brightness")
-	queryContrast := req.URL.Query().Get("contrast")
-	queryGamma := req.URL.Query().Get("gamma")
-	filterStr := req.URL.Query().Get("filter")
+	queryBrightness := query.Get("brightness")
+	queryContrast := query.Get("contrast")
+	queryGamma := query.Get("gamma")
+	filterStr := query.Get("filter")
 
 	if b, err := strconv.ParseFloat(queryBrightness, 64); err == nil && b >= -100 && b <= 100 {
 		sizeParts.brightness = b
@@ -149,6 +155,39 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	inputCodec := s.Codecs[strings.TrimPrefix(strings.ToLower(filepath.Ext(foundPath)), ".")]
+	revision := ""
+	if inputCodec != nil {
+		relativeSource, err := filepath.Rel(imageDir, foundPath)
+		if err != nil {
+			http.NotFound(res, req)
+			return
+		}
+		root, err := os.OpenRoot(imageDir)
+		if err != nil {
+			http.NotFound(res, req)
+			return
+		}
+		defer root.Close()
+		file, err := root.Open(relativeSource)
+		if err != nil {
+			http.NotFound(res, req)
+			return
+		}
+		decoded, err := inputCodec.Decode(req.Context(), file, foundPath)
+		file.Close()
+		if err != nil {
+			slog.Error("Image decode failed", "error", err)
+			http.Error(res, "Image decode failed", 500)
+			return
+		}
+		revision += inputCodec.Revision()
+		foundPath = decoded
+	}
+	if outputCodec != nil {
+		revision += outputCodec.Revision()
+	}
+
 	cacheKey := presetOrSizes
 	if sizeParts.hasSize {
 		cacheKey = presetOrSizes + "_" + string(sizeParts.fit)
@@ -175,7 +214,19 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		cacheKey += "_crop" + sizeParts.crop
 	}
 
-	finalPath := filepath.Join(cacheDir, relSourcePath, cacheKey+requestedExt)
+	processingExt := requestedExt
+	if outputCodec != nil {
+		processingExt = ".png"
+	}
+	if revision != "" {
+		info, err := os.Stat(foundPath)
+		if err != nil {
+			http.NotFound(res, req)
+			return
+		}
+		cacheKey += fmt.Sprintf("_%x", sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:%d", requestedExt, revision, info.Size(), info.ModTime().UnixNano()))))
+	}
+	finalPath := filepath.Join(cacheDir, relSourcePath, cacheKey+processingExt)
 
 	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
 		if err = os.MkdirAll(filepath.Dir(finalPath), 0755); err != nil {
@@ -205,5 +256,21 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	if outputCodec != nil {
+		file, err := os.Open(finalPath)
+		if err != nil {
+			http.Error(res, "Image cache unavailable", 500)
+			return
+		}
+		encoded, err := outputCodec.Encode(req.Context(), file, finalPath)
+		file.Close()
+		if err != nil {
+			slog.Error("Image encode failed", "error", err)
+			http.Error(res, "Image encode failed", 500)
+			return
+		}
+		finalPath = encoded
+		res.Header().Set("Content-Type", outputCodec.MIMEType())
+	}
 	http.ServeFile(res, req, finalPath)
 }
