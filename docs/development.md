@@ -67,7 +67,10 @@ Edit a topic in its reference page and link to it from examples instead of copyi
 shared API, deployment or execution-limit details.
 
 In the repository’s **Settings → Pages**, select **GitHub Actions** as the publishing
-source. The documentation workflow builds pull requests for validation and deploys
+source. Branch publishing runs a separate Jekyll deployment that can overwrite
+the Hugo site and cause a 404 at the home page. After changing the source, run the **Documentation** workflow
+on `main` to publish Hugo. Keep the custom domain set to `assetgoblin.sbolch.hu`.
+The documentation workflow builds pull requests for validation and deploys
 pushes to `main` or a manual run on `main`. It publishes only documentation and
 site assets; application source and Lua scripts are excluded. The workflow uses
 GitHub’s Pages actions; see [GitHub’s setup guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
