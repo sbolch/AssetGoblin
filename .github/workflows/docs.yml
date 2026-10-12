@@ -6,19 +6,15 @@ on:
     paths:
       - '**/*.md'
       - assets/**
-      - _includes/**
-      - _config.yml
-      - Gemfile
-      - Gemfile.lock
+      - layouts/**
+      - hugo.toml
       - .github/workflows/docs.yml
   pull_request:
     paths:
       - '**/*.md'
       - assets/**
-      - _includes/**
-      - _config.yml
-      - Gemfile
-      - Gemfile.lock
+      - layouts/**
+      - hugo.toml
       - .github/workflows/docs.yml
   workflow_dispatch:
 
@@ -34,14 +30,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Hugo
+        env:
+          HUGO_VERSION: 0.167.0
+        run: |
+          curl -fsSL "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz" | tar -xz -C "$RUNNER_TEMP" hugo
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Build documentation
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
+        run: hugo --destination _site --minify --panicOnWarning
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

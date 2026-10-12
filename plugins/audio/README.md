@@ -1,8 +1,7 @@
 ---
-layout: default
 title: Audio
-nav_order: 1
-parent: Example plugins
+weight: 1
+url: /plugins/audio/README.html
 ---
 
 # Audio plugin

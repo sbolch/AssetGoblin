@@ -1,8 +1,7 @@
 ---
-layout: default
 title: QOA
-nav_order: 4
-parent: Example plugins
+weight: 4
+url: /plugins/qoa/README.html
 ---
 
 # QOA audio extension

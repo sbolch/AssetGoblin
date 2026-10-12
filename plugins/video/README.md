@@ -1,8 +1,7 @@
 ---
-layout: default
 title: Video
-nav_order: 2
-parent: Example plugins
+weight: 2
+url: /plugins/video/README.html
 ---
 
 # Video plugin

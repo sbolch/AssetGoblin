@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Plugin API
-nav_order: 6
+weight: 6
+url: /docs/plugins.html
 ---
 
 # Plugin API

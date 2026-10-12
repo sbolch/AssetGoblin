@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Images
-nav_order: 3
+weight: 3
+url: /docs/images.html
 ---
 
 # Images

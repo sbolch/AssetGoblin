@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Configuration
-nav_order: 2
+weight: 2
+url: /docs/configuration.html
 ---
 
 # Configuration

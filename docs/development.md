@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Development
-nav_order: 8
+weight: 8
+url: /docs/development.html
 ---
 
 # Development
@@ -58,9 +58,11 @@ See [QOA setup](../plugins/qoa/README.md) for building it locally.
 ## Documentation site
 
 The README, reference pages and example READMEs are the documentation sources.
-Jekyll renders them with [Just the Docs](https://just-the-docs.com), providing
-search, sidebar navigation, heading links and syntax highlighting. Relative Markdown
-links work in GitHub and are rewritten to site URLs by `jekyll-relative-links`.
+Hugo renders them using the repository’s small documentation layout, with sidebar
+navigation, syntax highlighting and automatic light/dark
+colors. Markdown links keep working on GitHub; a Hugo render hook changes their
+`.md` destinations to published `.html` pages. The existing page URLs and mascot
+images are preserved.
 Edit a topic in its reference page and link to it from examples instead of copying
 shared API, deployment or execution-limit details.
 
@@ -70,12 +72,23 @@ pushes to `main` or a manual run on `main`. It publishes only documentation and
 site assets; application source and Lua scripts are excluded. The workflow uses
 GitHub’s Pages actions; see [GitHub’s setup guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
-To preview the same site locally with Ruby and Bundler installed:
+To preview locally, install [Hugo](https://gohugo.io/installation/) 0.167.0
+(the version pinned in the workflow), then run:
 
 ```sh
-bundle install
-bundle exec jekyll serve
+hugo server
 ```
 
-Open `http://localhost:4000/`. Generated `_site`, Bundler state and
-Jekyll caches are ignored. The theme is pinned in `_config.yml`; update it deliberately.
+Open `http://localhost:1313/`. To reproduce the deployment build:
+
+```sh
+hugo --destination _site --minify --panicOnWarning
+```
+
+`hugo.toml` mounts the existing README, reference pages and plugin READMEs without
+copying them into a separate content folder. Only Markdown files are mounted from
+plugin folders; Lua files and application sources are never published. Page front
+matter defines titles, weights and stable URLs. `layouts/` contains the templates
+and link hook; `assets/docs.css` provides styling.
+Generated `_site` and Hugo build state are ignored. No Ruby, Bundler,
+Node.js or external theme installation is required.

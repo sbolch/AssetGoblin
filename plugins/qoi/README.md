@@ -1,8 +1,7 @@
 ---
-layout: default
 title: QOI
-nav_order: 3
-parent: Example plugins
+weight: 3
+url: /plugins/qoi/README.html
 ---
 
 # QOI image codec plugin

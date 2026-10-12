@@ -1,8 +1,7 @@
 ---
-layout: default
 title: Example plugins
-nav_order: 7
-has_children: true
+weight: 7
+url: /plugins/README.html
 ---
 
 # Example plugins

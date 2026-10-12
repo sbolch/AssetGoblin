@@ -146,7 +146,8 @@ leaves register routes/codecs. Process pipelines share one deadline.
 security, CLI, plugin API and development references. Example plugin READMEs contain
 plugin-specific behavior and link to shared deployment/media parameters in their
 catalog. Avoid copying host limits or API details into examples.
-GitHub Pages renders these same Markdown sources with the pinned Just the Docs
-Jekyll theme; `_config.yml` controls navigation/search and source exclusions.
-The documentation workflow validates PR builds and deploys `main`. Keep relative
-Markdown links valid both in GitHub and through `jekyll-relative-links`.
+GitHub Pages renders these same Markdown sources with Hugo. `hugo.toml` mounts the
+existing documentation and assets; `layouts/` contains the site templates and
+Markdown link hook. The documentation workflow uses pinned Hugo 0.167.0, validates
+PR builds and deploys `main`. Keep relative Markdown links valid on GitHub; the
+render hook rewrites Markdown destinations to the stable HTML page URLs.

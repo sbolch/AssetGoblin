@@ -1,8 +1,6 @@
 ---
-layout: default
 title: Home
-nav_order: 1
-permalink: /
+weight: 1
 ---
 
 [![AssetGoblin](assets/header.png)](https://github.com/sbolch/AssetGoblin)
@@ -51,7 +49,7 @@ directory. Request `/img/640/photo.webp` to resize and convert an image, or
 - [Example plugins](plugins/README.md): audio, video, QOI and QOA setup.
 - [Development](docs/development.md): checks and documentation publishing.
 
-The same documentation is available as a searchable [GitHub Pages site](https://assetgoblin.sbolch.hu/).
+The same documentation is available as a [GitHub Pages site](https://assetgoblin.sbolch.hu/).
 
 ## Sponsors
 

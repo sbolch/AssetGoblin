@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Request security
-nav_order: 4
+weight: 4
+url: /docs/security.html
 ---
 
 # Request security

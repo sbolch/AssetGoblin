@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ .Title }} · {{ site.Title }}</title>
+  <link rel="canonical" href="{{ .Permalink }}">
+  <link rel="stylesheet" href="{{ "assets/docs.css" | relURL }}">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <aside class="sidebar">
+    <a class="brand" href="{{ site.Home.RelPermalink }}">AssetGoblin</a>
+    <nav aria-label="Documentation">
+      <a href="{{ site.Home.RelPermalink }}"{{ if .IsHome }} aria-current="page"{{ end }}>Home</a>
+      {{ $current := . }}
+      {{ range site.RegularPages.ByWeight }}
+        {{ if or (not (strings.HasPrefix .File.Path "plugins/")) (eq .File.Path "plugins/README.md") }}
+          <a href="{{ .RelPermalink }}"{{ if eq . $current }} aria-current="page"{{ end }}>{{ .Title }}</a>
+          {{ if eq .File.Path "plugins/README.md" }}
+            {{ range site.RegularPages.ByWeight }}
+              {{ if and (strings.HasPrefix .File.Path "plugins/") (ne .File.Path "plugins/README.md") }}
+                <a class="child" href="{{ .RelPermalink }}"{{ if eq . $current }} aria-current="page"{{ end }}>{{ .Title }}</a>
+              {{ end }}
+            {{ end }}
+          {{ end }}
+        {{ end }}
+      {{ end }}
+    </nav>
+    <a href="https://github.com/sbolch/AssetGoblin">Source on GitHub</a>
+  </aside>
+  <main id="main">
+    {{ block "main" . }}{{ end }}
+    <footer><a href="https://github.com/sbolch/AssetGoblin/edit/main/{{ if .IsHome }}README.md{{ else }}{{ with .File }}{{ .Path }}{{ end }}{{ end }}">Edit this page</a></footer>
+  </main>
+</body>
+</html>

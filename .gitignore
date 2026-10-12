@@ -4,7 +4,5 @@
 /config.*
 /coverage*
 /_site/
-/.jekyll-cache/
-/.jekyll-metadata
-/.bundle/
-/vendor/bundle/
+/.hugo_build.lock
+/resources/_gen/

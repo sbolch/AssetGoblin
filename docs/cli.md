@@ -1,7 +1,7 @@
 ---
-layout: default
 title: Command-line usage
-nav_order: 5
+weight: 5
+url: /docs/cli.html
 ---
 
 # Command-line usage

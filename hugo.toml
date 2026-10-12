@@ -1,0 +1,27 @@
+baseURL = "https://assetgoblin.sbolch.hu/"
+title = "AssetGoblin"
+publishDir = "_site"
+locale = "en"
+disableKinds = ["taxonomy", "term", "RSS", "section"]
+
+[markup.goldmark.renderer]
+unsafe = true
+
+[module]
+[[module.mounts]]
+source = "README.md"
+target = "content/_index.md"
+[[module.mounts]]
+source = "docs"
+target = "content/docs"
+files = ["*.md", "**/*.md"]
+[[module.mounts]]
+source = "plugins"
+target = "content/plugins"
+files = ["*.md", "**/*.md"]
+[[module.mounts]]
+source = "assets"
+target = "static/assets"
+
+[module.hugoVersion]
+min = "0.167.0"
