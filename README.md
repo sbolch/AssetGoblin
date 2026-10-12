@@ -51,7 +51,7 @@ directory. Request `/img/640/photo.webp` to resize and convert an image, or
 - [Example plugins](plugins/README.md): audio, video, QOI and QOA setup.
 - [Development](docs/development.md): checks and documentation publishing.
 
-The same documentation is available as a searchable [GitHub Pages site](https://sbolch.github.io/AssetGoblin/).
+The same documentation is available as a searchable [GitHub Pages site](https://assetgoblin.sbolch.hu/).
 
 ## Sponsors
 

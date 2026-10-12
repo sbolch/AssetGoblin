@@ -74,8 +74,8 @@ To preview the same site locally with Ruby and Bundler installed:
 
 ```sh
 bundle install
-bundle exec jekyll serve --baseurl /AssetGoblin
+bundle exec jekyll serve
 ```
 
-Open `http://localhost:4000/AssetGoblin/`. Generated `_site`, Bundler state and
+Open `http://localhost:4000/`. Generated `_site`, Bundler state and
 Jekyll caches are ignored. The theme is pinned in `_config.yml`; update it deliberately.
