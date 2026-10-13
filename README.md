@@ -39,6 +39,8 @@ Put images in `assets/img` and static files in `public`, relative to your workin
 directory. Request `/img/640/photo.webp` to resize and convert an image, or
 `/path/to/file` to serve a file from `public`. The default port is `8080`.
 
+For a container deployment, see the [Docker guide](docs/container.md).
+
 ## Documentation
 
 - [Configuration](docs/configuration.md): defaults, presets, lookup paths and caching.
@@ -47,6 +49,7 @@ directory. Request `/img/640/photo.webp` to resize and convert an image, or
 - [Command-line usage](docs/cli.md): server and maintenance flags.
 - [Plugin API](docs/plugins.md): deployment, callbacks, tools, codecs and inheritance.
 - [Example plugins](plugins/README.md): audio, video, QOI and QOA setup.
+- [Docker](docs/container.md): container images, mounts and GHCR publishing.
 - [Development](docs/development.md): checks and documentation publishing.
 
 The same documentation is available as a [GitHub Pages site](https://assetgoblin.sbolch.hu/).

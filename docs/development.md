@@ -57,6 +57,13 @@ see [audio dependencies](../plugins/audio/README.md#transformations) for local s
 and QOA additionally needs `qoaconv` on PATH. Linux CI builds a pinned QOA tool.
 See [QOA setup](../plugins/qoa/README.md) for building it locally.
 
+## Container packages
+
+The [Docker guide](container.md) covers local builds and deployment. The container
+workflow publishes multi-platform GHCR images on `main` and `v*` tags and builds
+pull requests without pushing. The Dockerfile excludes plugins by default; install
+them through a startup mount. Go tests remain in the existing test workflow.
+
 ## Documentation site
 
 The README, reference pages and example READMEs are the documentation sources.
