@@ -63,7 +63,7 @@ authors and contributors.
 | --- | --- | --- |
 |  | [Charm terminal utilities](https://github.com/charmbracelet/x/tree/main/term) | Terminal detection |
 | <img src="https://raw.githubusercontent.com/go-fuego/fuego/main/static/fuego.svg" width="64" alt="" loading="lazy" decoding="async"> | [Fuego](https://github.com/go-fuego/fuego) | HTTP server and routing |
-|  | [Gocuke](https://github.com/regen-network/gocuke) | Gherkin feature tests |
+| 🥒 | [Gocuke](https://github.com/regen-network/gocuke) | Gherkin feature tests |
 |  | [GopherLua](https://github.com/yuin/gopher-lua) | Lua plugin runtime |
 | <img src="https://gohugo.io/images/hugo-logo-wide.svg" width="64" alt="" loading="lazy" decoding="async"> | [Hugo](https://gohugo.io/) | Documentation site generation |
 | <img src="https://github.com/user-attachments/assets/d13bbe1a-d2b2-4d18-9302-419a0bc3f579" width="64" alt="" loading="lazy" decoding="async"> | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Terminal styling and tables |
