@@ -56,16 +56,18 @@ The same documentation is available as a [GitHub Pages site](https://assetgoblin
 
 ## Acknowledgements
 
-Thank you to the authors and contributors of these open-source dependencies and
-tools, listed alphabetically:
+AssetGoblin is built with the following open-source projects. Thank you to their
+authors and contributors.
 
-- [Charm terminal utilities](https://github.com/charmbracelet/x/tree/main/term): terminal detection.
-- <img src="https://raw.githubusercontent.com/go-fuego/fuego/main/static/fuego.svg" width="64" alt="" loading="lazy" decoding="async"> [Fuego](https://github.com/go-fuego/fuego): HTTP server and routing.
-- [Gocuke](https://github.com/regen-network/gocuke): Gherkin feature tests.
-- [GopherLua](https://github.com/yuin/gopher-lua): embedded Lua plugin runtime.
-- <img src="https://gohugo.io/images/hugo-logo-wide.svg" width="64" alt="" loading="lazy" decoding="async"> [Hugo](https://gohugo.io/): documentation site generation.
-- <img src="https://github.com/user-attachments/assets/d13bbe1a-d2b2-4d18-9302-419a0bc3f579" width="64" alt="" loading="lazy" decoding="async"> [Lip Gloss](https://github.com/charmbracelet/lipgloss): terminal styling and tables.
-- <img src="https://github.com/user-attachments/assets/acae9193-2974-41f3-808d-2d433f5ada5e" width="64" alt="" loading="lazy" decoding="async"> [Viper](https://github.com/spf13/viper): configuration loading.
+| | Project | Used for |
+| --- | --- | --- |
+|  | [Charm terminal utilities](https://github.com/charmbracelet/x/tree/main/term) | Terminal detection |
+| <img src="https://raw.githubusercontent.com/go-fuego/fuego/main/static/fuego.svg" width="64" alt="" loading="lazy" decoding="async"> | [Fuego](https://github.com/go-fuego/fuego) | HTTP server and routing |
+|  | [Gocuke](https://github.com/regen-network/gocuke) | Gherkin feature tests |
+|  | [GopherLua](https://github.com/yuin/gopher-lua) | Lua plugin runtime |
+| <img src="https://gohugo.io/images/hugo-logo-wide.svg" width="64" alt="" loading="lazy" decoding="async"> | [Hugo](https://gohugo.io/) | Documentation site generation |
+| <img src="https://github.com/user-attachments/assets/d13bbe1a-d2b2-4d18-9302-419a0bc3f579" width="64" alt="" loading="lazy" decoding="async"> | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Terminal styling and tables |
+| <img src="https://github.com/user-attachments/assets/acae9193-2974-41f3-808d-2d433f5ada5e" width="64" alt="" loading="lazy" decoding="async"> | [Viper](https://github.com/spf13/viper) | Configuration loading |
 
 ## Sponsors
 
