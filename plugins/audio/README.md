@@ -23,7 +23,16 @@ Audio supports temporal cropping/trimming and MP3, WAV, OGG/Vorbis conversion:
 /a/song.mp3?duration=20&format=ogg
 ```
 
-Transformation inputs: MP3, WAV, OGG, FLAC, M4A.
+Transformation inputs: MP3, WAV, OGG, FLAC, M4A. FFmpeg must include `libmp3lame`
+and `libvorbis` encoders. On macOS, Homebrew’s standard `ffmpeg` omits `libvorbis`;
+install `ffmpeg-full` and add its binaries to PATH:
+
+```sh
+brew install ffmpeg-full
+export PATH="$(brew --prefix ffmpeg-full)/bin:$PATH"
+```
+
+Use `ffmpeg -encoders` to inspect the available encoders.
 
 ## QOA extension
 

@@ -85,7 +85,8 @@ jobs:
           cache: true
       - name: Install ImageMagick and libvips
         run: |
-          brew install imagemagick vips ffmpeg
+          brew install imagemagick vips ffmpeg-full
+          echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"
       - name: Run tests
         run: |
           go vet ./...

@@ -51,7 +51,9 @@ transport and never contact GitHub or install updates.
 
 Run `go test ./... -race` when changing discovery, inheritance, callbacks, codecs
 or external-tool processing. Core process tests use an arbitrary text tool.
-Example loading is always tested; conversion tests require FFmpeg and ImageMagick,
+Example loading is always tested; conversion tests require FFmpeg and ImageMagick.
+macOS CI uses Homebrew’s `ffmpeg-full` for the audio plugin’s Vorbis encoder;
+see [audio dependencies](../plugins/audio/README.md#transformations) for local setup,
 and QOA additionally needs `qoaconv` on PATH. Linux CI builds a pinned QOA tool.
 See [QOA setup](../plugins/qoa/README.md) for building it locally.
 
