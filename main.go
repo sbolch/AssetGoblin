@@ -15,28 +15,18 @@ var conf config.Config
 
 var pluginsDir string
 
-// lookupBool returns the value of a named bool flag after flag.Parse.
-// It works even when the flag was registered by a dependency.
-func lookupBool(name string) bool {
-	f := flag.Lookup(name)
-	if f == nil {
-		return false
-	}
-	return f.Value.(flag.Getter).Get().(bool)
-}
-
 // main is the entry point of the application. It parses command-line flags
 // and executes the appropriate action based on the provided flags.
 func main() {
 	flag.StringVar(&pluginsDir, "plugins-dir", "", "Load Lua plugins from this directory (default: beside executable)")
 	serveFlag := flag.Bool("serve", false, "Run the server")
+	flag.BoolVar(serveFlag, "S", false, "Run the server (shorthand)")
 	clearGobFlag := flag.Bool("clear-gob", false, "Delete the cached gob config file")
 	printConfigFlag := flag.Bool("config", false, "Print effective config and config source info")
 	versionFlag := flag.Bool("version", false, "Print version info")
 	flag.BoolVar(versionFlag, "v", false, "Print version info (shorthand)")
-	if flag.Lookup("update") == nil {
-		flag.Bool("update", false, "Update to latest version")
-	}
+	updateFlag := flag.Bool("update", false, "Update to latest version")
+	flag.CommandLine.Usage = func() { printUsage(flag.CommandLine.Output()) }
 	flag.Parse()
 
 	if *serveFlag {
@@ -49,35 +39,31 @@ func main() {
 			slog.Error("Failed to delete gob config cache", "error", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Deleted gob config cache (if it existed): %s\n", config.GobFilePath())
+		printSuccess("Deleted gob config cache (if it existed): " + config.GobFilePath())
 		os.Exit(0)
 	} else if *versionFlag {
-		fmt.Println(Version)
-		fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
-		latest, _ := getLatestVersion()
-		if latest != Version {
-			fmt.Printf("\033[1;33mUpdate available: %s\033[0m\n", latest)
+		printVersionInfo(os.Stdout)
+		latest, err := getLatestVersion()
+		if err == nil && latest != Version {
+			printUpdateNotice(latest)
 		}
 		os.Exit(0)
-	} else if lookupBool("update") {
+	} else if *updateFlag {
 		update()
 	}
 
-	fmt.Println(Logo, "\nServe static files or dynamically manipulated images with ease")
+	printBranding()
 
-	latest, _ := getLatestVersion()
-	if latest != Version {
-		fmt.Println("\n\033[1;33m╔═════════════════════════════════╗\033[0m")
-		fmt.Printf("\033[1;33m  Update available: %s\033[0m\n", latest)
-		fmt.Println("\033[1;33m╚═════════════════════════════════╝\033[0m")
+	latest, err := getLatestVersion()
+	if err == nil && latest != Version {
+		fmt.Println()
+		printUpdateNotice(latest)
 	}
 
-	fmt.Println("\nUsage:")
-	flag.PrintDefaults()
-
-	fmt.Println("\nHomepage: https://github.com/sbolch/AssetGoblin")
-	fmt.Println("Version: ", Version)
-	fmt.Printf("Build: %s #%s\n", BuildTime, GitCommit)
+	fmt.Println()
+	printUsage(os.Stdout)
+	fmt.Println()
+	printFooter()
 
 	os.Exit(0)
 }

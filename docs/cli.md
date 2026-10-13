@@ -13,13 +13,14 @@ url: /docs/cli.html
   </picture>
 </p>
 
-## -help
+## -help | -h
 
 List flags
 
-## -serve
+## -serve | -S
 
-Run the server
+Run the server. A startup table shows the listen address, asset directories,
+plugin routes and plugin image codecs before the listener starts.
 
 ## -clear-gob
 
@@ -27,11 +28,17 @@ Delete the cached gob config file from the OS default cache directory.
 
 ## -config
 
-Print the effective config as a table, including the used config file location, whether it was loaded from gob cache, and the gob cache file path.
+Print the effective config as a Lip Gloss table, including the used config file location, whether it was loaded from gob cache, and the gob cache file path.
 
 ## -update
 
-Update to latest version
+Update to the latest version. A Lip Gloss progress bar shows downloaded bytes and
+percentage when the server supplies the archive size; otherwise it shows the byte
+count. Terminal output refreshes in place, while redirected output prints only
+the initial and final download lines. Checksum verification, extraction and
+installation are reported as separate stages. Download failures use red styling;
+release notes appear under a heading and wrap to the terminal width (up to 80
+columns). Release notes retain their original Markdown text.
 
 ## -version | -v
 
@@ -40,3 +47,11 @@ Print version info
 ## -plugins-dir
 
 Override the Lua plugin discovery directory. See [plugin deployment](plugins.md#runtime-plugins).
+
+## Terminal formatting
+
+The logo, help and configuration tables, version details, success messages and update
+notices use [Lip Gloss](https://github.com/charmbracelet/lipgloss)
+for layout and color. Colors adapt to the output terminal, are removed for redirected
+output, and respect `NO_COLOR`. Update notices appear only after a successful release
+check reports a different version.

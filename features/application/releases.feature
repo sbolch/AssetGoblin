@@ -61,3 +61,26 @@ Feature: Release metadata and update selection
     Given a release asset "windows.zip" at "https://example.com/windows.zip"
     When the checksum URL is selected
     Then no matching asset should be found
+
+  Scenario: Redirected download progress reports completion without cursor controls
+    When a download of 100 bytes with advertised size 100 uses redirected progress and succeeds
+    Then command output should contain "100% (100/100 bytes)"
+    And command output should contain no terminal escape sequences
+    And download progress should not refresh in place
+
+  Scenario: Unknown archive sizes show bytes without a misleading percentage
+    When a download of 100 bytes with advertised size -1 uses redirected progress and succeeds
+    Then command output should contain "Downloading: 100 bytes"
+    And command output should not contain "%"
+    And command output should contain no terminal escape sequences
+
+  Scenario: Failed downloads retain partial progress
+    When a download of 25 bytes with advertised size 100 uses redirected progress and fails
+    Then command output should contain "25% (25/100 bytes)"
+    And command output should contain "Download failed."
+    And command output should not contain "100%"
+
+  Scenario: Terminal progress refreshes in place even with colors disabled
+    When a download of 50 bytes with advertised size 100 uses terminal progress and succeeds
+    Then command output should contain "50% (50/100 bytes)"
+    And download progress should refresh in place

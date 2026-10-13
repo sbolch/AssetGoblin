@@ -103,6 +103,15 @@ func serve() {
 		slog.Error("Failed to configure server", "error", err)
 		os.Exit(1)
 	}
+	routes := make([]string, 0, len(manager.Handlers()))
+	for _, handler := range manager.Handlers() {
+		routes = append(routes, handler.Path())
+	}
+	codecs := make([]string, 0, len(manager.ImageCodecs()))
+	for name := range manager.ImageCodecs() {
+		codecs = append(codecs, name)
+	}
+	printServerSummary(os.Stdout, &conf, srv.Addr, routes, codecs)
 	slog.Info("Starting server", "port", conf.Port)
 	// Fuego applies the same middleware chain when starting the listener.
 	if err := srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -21,6 +21,9 @@ import (
 	"unicode"
 
 	"assetgoblin/utils"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/term"
 )
 
 // Version is the current version of the application.
@@ -124,11 +127,11 @@ func update() {
 	}
 
 	if latest == Version {
-		fmt.Println("Already up to date.")
+		printSuccess("Already up to date.")
 		os.Exit(0)
 	}
 
-	slog.Info("Updating", "from", Version, "to", latest)
+	lipgloss.Fprintln(os.Stdout, cliHeading.Render("Updating "+Version+" → "+latest))
 
 	updateName := releaseArchiveName(latest, runtime.GOOS, runtime.GOARCH)
 
@@ -137,8 +140,6 @@ func update() {
 		slog.Error("Failed to find update", "os", runtime.GOOS)
 		os.Exit(1)
 	}
-
-	slog.Info("Downloading updated archive...")
 
 	client := &http.Client{Timeout: 60 * time.Second}
 	res, err := client.Get(updateDownloadURL)
@@ -164,7 +165,9 @@ func update() {
 		}
 	}()
 
-	_, err = io.Copy(tmpFile, res.Body)
+	progress := utils.NewUpdateProgress(os.Stdout, res.ContentLength, term.IsTerminal(os.Stdout.Fd()) && os.Getenv("TERM") != "dumb", cliHeading)
+	_, err = io.Copy(tmpFile, io.TeeReader(res.Body, progress))
+	progress.Finish(err == nil)
 	if err != nil {
 		slog.Error("Failed to write temporary file", "error", err)
 		os.Exit(1)
@@ -172,7 +175,7 @@ func update() {
 
 	utils.CloseFile(tmpFile)
 
-	slog.Info("Downloading checksum file...")
+	lipgloss.Fprintln(os.Stdout, cliHeading.Render("Verifying checksum…"))
 
 	checksumURL, found := findChecksumURL(r.Assets)
 	if !found {
@@ -223,7 +226,8 @@ func update() {
 		os.Exit(1)
 	}
 
-	slog.Info("Checksum verified")
+	printSuccess("Checksum verified.")
+	lipgloss.Fprintln(os.Stdout, cliHeading.Render("Extracting update…"))
 
 	wd, _ := os.Getwd()
 	currentExecutablePath, err := os.Executable()
@@ -332,6 +336,7 @@ func update() {
 		os.Exit(1)
 	}
 
+	lipgloss.Fprintln(os.Stdout, cliHeading.Render("Installing update…"))
 	currentExecutable := filepath.Join(wd, "assetgoblin")
 	backupExecutable := filepath.Join(wd, "assetgoblin_"+Version)
 	newExecutable := filepath.Join(wd, "assetgoblin_"+latest)
@@ -365,8 +370,12 @@ func update() {
 		slog.Warn("Failed to remove backup executable", "error", err)
 	}
 
-	slog.Info("Update finished successfully")
-	fmt.Println(r.Body)
+	printSuccess("Update finished successfully.")
+	width := 80
+	if columns, _, err := term.GetSize(os.Stdout.Fd()); err == nil && columns > 0 {
+		width = min(columns, width)
+	}
+	printReleaseNotes(os.Stdout, r.Body, width)
 
 	os.Exit(0)
 }
