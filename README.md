@@ -215,3 +215,8 @@ Print version info
 ## Sponsors
 
 <a href="https://gazmag.hu" target="_blank"><img src="https://gazmag.hu/icon/logo-long.svg" alt="GazMag" height="50"></a>
+
+## Security patch v0.10.1
+
+Release v0.10.1 uses Go 1.27.3 and updates dependencies to address published
+Go vulnerability advisories. Build from source with Go 1.27.3 or newer.
