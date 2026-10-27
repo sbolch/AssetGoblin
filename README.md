@@ -55,10 +55,6 @@ For a container deployment, see the [Docker guide](docs/container.md).
 
 The same documentation is available as a [GitHub Pages site](https://assetgoblin.sbolch.hu/).
 
-## External packages
-
-- [AssetGoblinLua](https://github.com/sybolch/AssetGoblinLua): Optional Lua 5.1 backend for custom builds.
-
 ## Acknowledgements
 
 AssetGoblin is built with the following open-source projects. Thank you to their
@@ -66,14 +62,18 @@ authors and contributors.
 
 | | Project | Used for |
 | --- | --- | --- |
+| | [go-limiter](https://github.com/sethvargo/go-limiter) | Per-IP HTTP rate limiting |
+| | [go-selfupdate](https://github.com/creativeprojects/go-selfupdate) | Verified executable updates |
 |  | [Charm terminal utilities](https://github.com/charmbracelet/x/tree/main/term) | Terminal detection |
 | <img src="https://raw.githubusercontent.com/go-fuego/fuego/main/static/fuego.svg" width="64" alt="" loading="lazy" decoding="async"> | [Fuego](https://github.com/go-fuego/fuego) | HTTP server and routing |
 | 🥒 | [Gocuke](https://github.com/regen-network/gocuke) | Gherkin feature tests |
 | <img src="https://gohugo.io/images/hugo-logo-wide.svg" width="64" alt="" loading="lazy" decoding="async"> | [Hugo](https://gohugo.io/) | Documentation site generation |
 | <img src="https://github.com/user-attachments/assets/d13bbe1a-d2b2-4d18-9302-419a0bc3f579" width="64" alt="" loading="lazy" decoding="async"> | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Terminal styling and tables |
 | <img src="https://github.com/user-attachments/assets/acae9193-2974-41f3-808d-2d433f5ada5e" width="64" alt="" loading="lazy" decoding="async"> | [Viper](https://github.com/spf13/viper) | Configuration loading |
-| | [go-selfupdate](https://github.com/creativeprojects/go-selfupdate) | Verified executable updates |
-| | [go-limiter](https://github.com/sethvargo/go-limiter) | Per-IP HTTP rate limiting |
+
+## External packages
+
+- [AssetGoblinLua](https://github.com/sybolch/AssetGoblinLua): Optional Lua 5.1 backend for custom builds.
 
 ## Sponsors
 
