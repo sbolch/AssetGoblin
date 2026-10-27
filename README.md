@@ -15,6 +15,12 @@ weight: 1
 </p>
 
 [![Latest Release](https://img.shields.io/github/v/release/sbolch/AssetGoblin.svg)](https://github.com/sbolch/AssetGoblin/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/sbolch/AssetGoblin/main?logo=go)](https://github.com/sbolch/AssetGoblin/blob/main/go.mod)
+[![Tests](https://img.shields.io/github/actions/workflow/status/sbolch/AssetGoblin/test.yml?branch=main&event=push&label=tests)](https://github.com/sbolch/AssetGoblin/actions/workflows/test.yml)
+[![Container Build](https://img.shields.io/github/actions/workflow/status/sbolch/AssetGoblin/container.yml?branch=main&event=push&label=container&logo=docker)](https://github.com/sbolch/AssetGoblin/pkgs/container/assetgoblin)
+[![Documentation](https://img.shields.io/github/actions/workflow/status/sbolch/AssetGoblin/docs.yml?branch=main&event=push&label=docs)](https://assetgoblin.sbolch.hu/)
+[![Downloads](https://img.shields.io/github/downloads/sbolch/AssetGoblin/total)](https://github.com/sbolch/AssetGoblin/releases)
+[![License](https://img.shields.io/github/license/sbolch/AssetGoblin)](https://github.com/sbolch/AssetGoblin/blob/main/LICENSE)
 
 Serve static files and transform images through presets or URL parameters.
 Optional Python plugins add audio, video and extra formats without rebuilding the server.
