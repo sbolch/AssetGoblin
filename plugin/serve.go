@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -10,15 +9,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	lua "github.com/yuin/gopher-lua"
 )
 
 type routeHandler struct {
 	prefix    string
 	directory string
 	plugin    *script
-	handle    *lua.LFunction
+	handle    Callback
 }
 
 func (r *routeHandler) Path() string                                      { return r.prefix }
@@ -28,7 +25,6 @@ type response struct {
 	status    int
 	headers   http.Header
 	body      string
-	process   *processPlan
 	processes []processPlan
 	file      string
 }
@@ -104,7 +100,7 @@ func (r *routeHandler) serve(w http.ResponseWriter, req *http.Request) {
 			w.Header()[key] = values
 		}
 		// Keep the original request's Range, If-Modified-Since, etc., while letting
-		// Lua map a URL to a different file beneath its configured root.
+		// plugins map a URL to a different file beneath its configured root.
 		clone := req.Clone(req.Context())
 		clone.URL.Path = "/" + result.file
 		clone.URL.RawPath = ""
@@ -130,56 +126,34 @@ func (r *routeHandler) serve(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// Only Lua execution is serialized per plugin. Files stream outside the interpreter.
+// Only callback execution is serialized per plugin; files stream concurrently.
 func (r *routeHandler) call(req *http.Request, relative string) (response, error) {
-	ctx, cancel := context.WithTimeout(req.Context(), scriptTimeout)
-	defer cancel()
-	plugin := r.plugin
-	select {
-	case plugin.gate <- struct{}{}:
-	case <-ctx.Done():
-		return response{}, ctx.Err()
-	}
-	defer func() { <-plugin.gate }()
-	if plugin.closed {
-		return response{}, fmt.Errorf("plugin is closed")
-	}
-	state := plugin.state
-	state.SetContext(ctx)
-	defer state.RemoveContext()
-	stackTop := state.GetTop()
-	defer state.SetTop(stackTop)
-	request := state.NewTable()
-	request.RawSetString("method", lua.LString(req.Method))
-	request.RawSetString("path", lua.LString(relative))
-	request.RawSetString("full_path", lua.LString(req.URL.Path))
-	query := state.NewTable()
+	query := map[string]any{}
 	for key, values := range req.URL.Query() {
 		if len(values) > 0 {
-			query.RawSetString(key, lua.LString(values[0]))
+			query[key] = values[0]
 		}
 	}
-	request.RawSetString("query", query)
-	headers := state.NewTable()
+	headers := map[string]any{}
 	for key, values := range req.Header {
-		headers.RawSetString(strings.ToLower(key), lua.LString(strings.Join(values, ", ")))
+		headers[strings.ToLower(key)] = strings.Join(values, ", ")
 	}
-	request.RawSetString("headers", headers)
-	if err := state.CallByParam(lua.P{Fn: r.handle, NRet: 1, Protect: true}, request); err != nil {
+	value, err := r.plugin.invoke(req.Context(), r.handle, map[string]any{"method": req.Method, "path": relative, "full_path": req.URL.Path, "query": query, "headers": headers})
+	if err != nil {
 		return response{}, err
 	}
-	table, ok := state.Get(-1).(*lua.LTable)
-	if !ok {
-		return response{}, fmt.Errorf("handle must return a response table")
-	}
-	return parseResponse(table)
+	return parseResponse(value)
 }
 
-func parseResponse(table *lua.LTable) (response, error) {
+func parseResponse(value any) (response, error) {
+	table, ok := value.(map[string]any)
+	if !ok {
+		return response{}, fmt.Errorf("handle must return a response object")
+	}
 	result := response{status: http.StatusOK, headers: make(http.Header)}
-	if value := table.RawGetString("status"); value != lua.LNil {
-		number, ok := value.(lua.LNumber)
-		if !ok || number < 200 || number > 599 || number != lua.LNumber(int(number)) {
+	if value := table["status"]; value != nil {
+		number, ok := value.(float64)
+		if !ok || number < 200 || number > 599 || number != float64(int(number)) {
 			return result, fmt.Errorf("invalid response status")
 		}
 		result.status = int(number)
@@ -188,34 +162,33 @@ func parseResponse(table *lua.LTable) (response, error) {
 		name   string
 		target *string
 	}{{"body", &result.body}, {"file", &result.file}} {
-		value := table.RawGetString(field.name)
-		if value == lua.LNil {
+		value := table[field.name]
+		if value == nil {
 			continue
 		}
-		str, ok := value.(lua.LString)
+		str, ok := value.(string)
 		if !ok {
 			return result, fmt.Errorf("%s must be a string", field.name)
 		}
-		*field.target = string(str)
+		*field.target = str
 	}
-	if table.RawGetString("transform") != lua.LNil {
+	if table["transform"] != nil {
 		return result, fmt.Errorf("transform is no longer supported; plugin must supply process logic")
 	}
-	if value := table.RawGetString("process"); value != lua.LNil {
+	if value := table["process"]; value != nil {
 		plan, err := parseProcess(value)
 		if err != nil {
 			return result, err
 		}
-		result.process = plan
 		result.processes = append(result.processes, *plan)
 	}
-	if value := table.RawGetString("processes"); value != lua.LNil {
-		list, ok := value.(*lua.LTable)
-		if !ok || list.Len() < 1 || list.Len() > 8 || result.process != nil {
+	if value := table["processes"]; value != nil {
+		list, ok := value.([]any)
+		if !ok || len(list) < 1 || len(list) > 8 || table["process"] != nil {
 			return result, fmt.Errorf("processes requires 1..8 stages and no process")
 		}
-		for i := 1; i <= list.Len(); i++ {
-			plan, err := parseProcess(list.RawGetInt(i))
+		for _, value := range list {
+			plan, err := parseProcess(value)
 			if err != nil {
 				return result, err
 			}
@@ -234,29 +207,22 @@ func parseResponse(table *lua.LTable) (response, error) {
 	if (result.status == http.StatusNoContent || result.status == http.StatusNotModified) && result.body != "" {
 		return result, fmt.Errorf("response status does not allow a body")
 	}
-	if value := table.RawGetString("headers"); value != lua.LNil {
-		headers, ok := value.(*lua.LTable)
+	if value := table["headers"]; value != nil {
+		headers, ok := value.(map[string]any)
 		if !ok {
-			return result, fmt.Errorf("headers must be a table")
+			return result, fmt.Errorf("headers must be an object")
 		}
-		var headerErr error
-		headers.ForEach(func(key, value lua.LValue) {
-			name, nameOK := key.(lua.LString)
-			text, valueOK := value.(lua.LString)
-			if !nameOK || !valueOK || !validHeaderName(string(name)) || strings.ContainsAny(string(text), "\r\n\x00") {
-				headerErr = fmt.Errorf("invalid response header")
-				return
+		for name, value := range headers {
+			text, valueOK := value.(string)
+			if !valueOK || !validHeaderName(name) || strings.ContainsAny(text, "\r\n\x00") {
+				return result, fmt.Errorf("invalid response header")
 			}
-			canonical := textproto.CanonicalMIMEHeaderKey(string(name))
+			canonical := textproto.CanonicalMIMEHeaderKey(name)
 			switch canonical {
 			case "Content-Length", "Transfer-Encoding", "Connection", "Trailer", "Upgrade":
-				headerErr = fmt.Errorf("header %s is managed by the host", canonical)
-				return
+				return result, fmt.Errorf("header %s is managed by the host", canonical)
 			}
-			result.headers.Set(canonical, string(text))
-		})
-		if headerErr != nil {
-			return result, headerErr
+			result.headers.Set(canonical, text)
 		}
 	}
 	return result, nil
@@ -274,24 +240,24 @@ func validHeaderName(name string) bool {
 	return true
 }
 
-func parseProcess(value lua.LValue) (*processPlan, error) {
-	spec, ok := value.(*lua.LTable)
+func parseProcess(value any) (*processPlan, error) {
+	spec, ok := value.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("process must be table")
+		return nil, fmt.Errorf("process must be an object")
 	}
-	tool, tOK := spec.RawGetString("tool").(lua.LString)
-	extension, eOK := spec.RawGetString("extension").(lua.LString)
-	args, aOK := spec.RawGetString("args").(*lua.LTable)
+	tool, tOK := spec["tool"].(string)
+	extension, eOK := spec["extension"].(string)
+	args, aOK := spec["args"].([]any)
 	if !tOK || !eOK || !aOK {
 		return nil, fmt.Errorf("process needs tool, extension and args")
 	}
-	plan := &processPlan{Tool: string(tool), Extension: string(extension)}
-	for i := 1; i <= args.Len(); i++ {
-		arg, ok := args.RawGetInt(i).(lua.LString)
+	plan := &processPlan{Tool: tool, Extension: extension}
+	for _, value := range args {
+		arg, ok := value.(string)
 		if !ok {
 			return nil, fmt.Errorf("process arguments must be strings")
 		}
-		plan.Args = append(plan.Args, string(arg))
+		plan.Args = append(plan.Args, arg)
 	}
 	return plan, plan.validate()
 }

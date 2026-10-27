@@ -15,22 +15,26 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -ldflags="-s -w -X main.Version=$VERSION -X main.BuildTime=$BUILD_TIME -X main.GitCommit=$GIT_COMMIT" \
     -o /out/assetgoblin .
 
-FROM debian:bookworm-slim
+FROM alpine:3.24.3
 LABEL org.opencontainers.image.source="https://github.com/sbolch/AssetGoblin" \
-      org.opencontainers.image.description="Static assets, image transformations and portable Lua plugins" \
+      org.opencontainers.image.description="Serve static files or dynamically manipulated images with ease" \
       org.opencontainers.image.licenses="MIT"
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates imagemagick libvips-tools ffmpeg \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 10001 assetgoblin \
-    && useradd --uid 10001 --gid assetgoblin --no-create-home --home-dir /app assetgoblin \
-    && mkdir -p /app/assets/img /app/public /plugins /cache \
-    && chown -R assetgoblin:assetgoblin /app /cache
+
+RUN apk add --no-cache ca-certificates python3 py3-pip imagemagick imagemagick-heic vips-tools vips-heif ffmpeg tzdata \
+    && addgroup -S -g 10001 assetgoblin \
+    && adduser -S -D -H -u 10001 -G assetgoblin -h /srv/assetgoblin assetgoblin \
+    && mkdir -p /srv/assetgoblin/assets/img /srv/assetgoblin/public \
+        /var/cache/assetgoblin /etc/assetgoblin /usr/local/lib/assetgoblin/plugins \
+    && chown -R 10001:10001 /srv/assetgoblin /var/cache/assetgoblin
 COPY --from=build /out/assetgoblin /usr/local/bin/assetgoblin
 COPY LICENSE /usr/share/doc/assetgoblin/LICENSE
-ENV XDG_CACHE_HOME=/cache
-WORKDIR /app
+
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    HOME=/srv/assetgoblin \
+    LANG=C.UTF-8 \
+    XDG_CACHE_HOME=/var/cache
+WORKDIR /srv/assetgoblin
 USER 10001:10001
 EXPOSE 8080
 ENTRYPOINT ["assetgoblin"]
-CMD ["-serve", "-plugins-dir", "/plugins"]
+CMD ["-serve", "-plugins-dir", "/usr/local/lib/assetgoblin/plugins"]

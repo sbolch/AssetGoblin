@@ -1,8 +1,10 @@
 /.idea/
 /dist/
+/_site/
+/.hugo_build.lock
 /assetgoblin*
 /config.*
 /coverage*
-/_site/
-/.hugo_build.lock
-/resources/_gen/
+
+__pycache__/
+*.pyc

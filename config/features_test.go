@@ -1,14 +1,17 @@
 package config
 
 import (
-	"assetgoblin/utils"
-	"github.com/regen-network/gocuke"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/regen-network/gocuke"
+
+	"assetgoblin/utils"
 )
 
 func TestConfigurationFeatures(t *testing.T) {
@@ -25,6 +28,7 @@ func TestConfigurationFeatures(t *testing.T) {
 		Step(`^the default configuration should be used$`, (*configurationSuite).Defaults).
 		Step(`^configuration should be marked as loaded from (disk|gob)$`, (*configurationSuite).Origin).
 		Step(`^the configured port should be "([^"]*)"$`, (*configurationSuite).Port).
+		Step(`^the Python executable should be "([^"]*)"$`, (*configurationSuite).PythonExecutable).
 		Step(`^the public directory should be "([^"]*)"$`, (*configurationSuite).PublicDirectory).
 		Step(`^the configuration source should be the configuration file$`, (*configurationSuite).Source).
 		Step(`^configuration is saved to the gob cache$`, (*configurationSuite).Save).
@@ -38,6 +42,7 @@ func TestConfigurationFeatures(t *testing.T) {
 		Step(`^the user configuration directory should be searched$`, (*configurationSuite).UserLookup).
 		Step(`^the default cache directory is resolved$`, (*configurationSuite).CacheDirectory).
 		Step(`^it should be the application directory under the OS user cache$`, (*configurationSuite).UserCache).
+		Step(`^preset "([^"]*)" should have settings (.*)$`, (*configurationSuite).PresetSettings).
 		Run()
 }
 
@@ -67,7 +72,7 @@ func (s *configurationSuite) File(content string) {
 	}
 }
 func (s *configurationSuite) Custom() {
-	s.cfg = Config{Port: "9090", PublicDir: "custom-public", Secret: "test-secret", RateLimit: RateLimit{Limit: 100, Ttl: 30 * time.Second}, Image: Image{Path: "/custom-img/", Directory: "custom-assets/img", CacheDir: "custom-cache", AvifThroughVips: true, Formats: []string{"jpeg", "png"}, Presets: map[string]utils.ImagePreset{"custom": {Width: 800, Height: 600, Fit: "contain", Rotate: 90, Flip: "horizontal", Crop: "center", Brightness: 10, Contrast: -25, Gamma: 1.5, Filters: []string{"grayscale", "blur"}}}}, UsedConfigFile: "saved-config.json"}
+	s.cfg = Config{PythonExecutable: "/opt/plugin environment/bin/python", Port: "9090", PublicDir: "custom-public", Secret: "test-secret", RateLimit: RateLimit{Limit: 100, Ttl: 30 * time.Second}, Image: Image{Path: "/custom-img/", Directory: "custom-assets/img", CacheDir: "custom-cache", AvifThroughVips: true, Formats: []string{"jpeg", "png"}, Presets: map[string]utils.ImagePreset{"custom": {Width: 800, Height: 600, Fit: "contain", Rotate: 90, Flip: "horizontal", Crop: "center", Brightness: 10, Contrast: -25, Gamma: 1.5, Filters: []string{"grayscale", "blur"}}}}, UsedConfigFile: "saved-config.json"}
 	s.original = s.cfg
 }
 func (s *configurationSuite) Load() { s.err = s.cfg.Load() }
@@ -166,5 +171,23 @@ func (s *configurationSuite) UserCache() {
 	}
 	if s.cache != filepath.Join(dir, appDirName) {
 		s.Fatalf("wrong user cache location %q", s.cache)
+	}
+}
+
+func (s *configurationSuite) PythonExecutable(value string) {
+	s.Helper()
+	if s.err != nil || s.cfg.PythonExecutable != value {
+		s.Fatalf("expected Python executable %q, got %q (%v)", value, s.cfg.PythonExecutable, s.err)
+	}
+}
+
+func (s *configurationSuite) PresetSettings(name, data string) {
+	s.Helper()
+	var expected utils.ImagePreset
+	if err := json.Unmarshal([]byte(data), &expected); err != nil {
+		s.Fatal(err)
+	}
+	if s.err != nil || !reflect.DeepEqual(s.cfg.Image.Presets[name], expected) {
+		s.Fatalf("preset %q: got %+v (%v), want %+v", name, s.cfg.Image.Presets[name], s.err, expected)
 	}
 }

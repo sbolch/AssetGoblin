@@ -14,7 +14,6 @@ Feature: Command-line operations
       | -serve=false                  | Usage:              |
       | -config                       | 8080                |
       | -clear-gob                    | Deleted gob config  |
-      | -update                       | Already up to date. |
       | -plugins-dir=missing -version | development         |
 
   Scenario: Unknown flags fail with a usage error
@@ -109,6 +108,7 @@ Feature: Command-line operations
     And command output should contain "-S"
     And command output should contain "-serve"
     And command output should contain "-plugins-dir string"
+    And command output should not contain "-python string"
     And command output should contain no terminal escape sequences
 
     Examples:
@@ -143,7 +143,8 @@ Feature: Command-line operations
       | -v        |
 
   Scenario Outline: Success messages remain readable without colors
-    Given CLI colors are disabled
+    Given the CLI build version is "v1.0.0"
+    And CLI colors are disabled
     When AssetGoblin runs with arguments "<arguments>"
     Then the command should exit with code 0
     And command output should contain "<message>"
@@ -183,3 +184,38 @@ Feature: Command-line operations
   Scenario: Empty release notes produce no heading
     When release notes "" are rendered at width 80
     Then command output should not contain "Release notes:"
+
+  Scenario: The interpreter runtime flag is no longer accepted
+    When AssetGoblin runs with arguments "-python=missing -version"
+    Then the command should exit with code 2
+    And command output should contain "flag provided but not defined"
+
+  Scenario: The effective configuration shows the Python interpreter
+    Given CLI configuration contains {"python_executable":"/opt/plugin-env/bin/python"}
+    When AssetGoblin runs with arguments "-clear-gob"
+    And AssetGoblin runs with arguments "-config"
+    Then the command should exit with code 0
+    And command output should contain "python_executable"
+    And command output should contain "/opt/plugin-env/bin/python"
+
+  Scenario: Serving uses the configured Python interpreter
+    Given CLI configuration contains {"python_executable":"./missing-configured-python"}
+    And a CLI Python plugin
+    When AssetGoblin runs with arguments "-clear-gob"
+    And AssetGoblin runs with arguments "-serve -plugins-dir=."
+    Then the command should exit with code 1
+    And command output should contain "start Python"
+    And command output should contain "missing-configured-python"
+
+  Scenario: Update failures return a failing exit status
+    Given the release API responds with status 503 and body unavailable
+    When AssetGoblin runs with arguments "-update"
+    Then the command should exit with code 1
+    And command output should contain "Failed to update"
+    And command output should not contain "Update finished successfully."
+
+  Scenario: Missing releases do not report a successful update
+    Given the release API responds with status 200 and body []
+    When AssetGoblin runs with arguments "-update"
+    Then the command should exit with code 1
+    And command output should contain "no compatible release available"

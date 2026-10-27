@@ -1,7 +1,6 @@
 package main
 
 import (
-	"assetgoblin/plugin"
 	"bytes"
 	"context"
 	"crypto/hmac"
@@ -24,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"assetgoblin/image"
+	"assetgoblin/plugin"
+
 	"github.com/go-fuego/fuego"
 )
 
@@ -31,10 +33,16 @@ func (s *assetgoblinSuite) featureServer() (*fuego.Server, error) {
 	if s.pluginLoadErr != nil {
 		return nil, s.pluginLoadErr
 	}
-	if s.pluginManager == nil {
-		return newServer(s.config)
+	var codecs map[string]image.Codec
+	var handlers []plugin.RouteHandler
+	if s.pluginManager != nil {
+		codecs, handlers = s.pluginManager.ImageCodecs(), s.pluginManager.Handlers()
 	}
-	return newServerWithCodecs(s.config, s.pluginManager.ImageCodecs(), s.pluginManager.Handlers()...)
+	server, cleanup, err := newServer(s.config, codecs, handlers...)
+	if cleanup != nil {
+		s.serverCleanups = append(s.serverCleanups, cleanup)
+	}
+	return server, err
 }
 
 func (s *assetgoblinSuite) pluginDirectory() string {
@@ -85,18 +93,26 @@ func (s *assetgoblinSuite) ImageCodecRegistered(name string) {
 }
 func (s *assetgoblinSuite) writeRuntimePlugin(name, source string) {
 	s.Helper()
-	if err := os.WriteFile(filepath.Join(s.pluginDirectory(), "assetgoblin-"+name+".lua"), []byte(source), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(s.pluginDirectory(), "assetgoblin-"+name+".py"), []byte(source), 0600); err != nil {
 		s.Fatal(err)
 	}
 }
 func (s *assetgoblinSuite) ParentPlugin(body, prefix string) {
-	s.writeRuntimePlugin("parent", fmt.Sprintf(`return {api_version=1,routes={{path=%q,handle=function(r)return {body=%q} end}}}`, prefix, body))
+	s.writeRuntimePlugin("parent", fmt.Sprintf(`plugin = {"api_version": 1, "routes": [{"path": %q, "handle": lambda r: {"body": %q}}]}`, prefix, body))
 }
 func (s *assetgoblinSuite) ChildPlugin(suffix string) {
-	s.writeRuntimePlugin("child", fmt.Sprintf(`return {api_version=1,extends='parent',extend=function(p)local old=p.routes[1].handle;p.routes[1].handle=function(r)local result=old(r);result.body=result.body..%q;return result end;return p end}`, suffix))
+	s.writeRuntimePlugin("child", fmt.Sprintf(`def extend(parent):
+    original = parent["routes"][0]["handle"]
+    def handle(request):
+        result = original(request)
+        result["body"] += %q
+        return result
+    parent["routes"][0]["handle"] = handle
+    return parent
+plugin = {"api_version": 1, "extends": "parent", "extend": extend}`, suffix))
 }
 func (s *assetgoblinSuite) CyclicPlugin() {
-	s.writeRuntimePlugin("cycle", `return {api_version=1,extends='cycle',extend=function(p)return p end}`)
+	s.writeRuntimePlugin("cycle", `plugin = {"api_version": 1, "extends": "cycle", "extend": lambda p: p}`)
 }
 func (s *assetgoblinSuite) PluginLoadingFails(message string) {
 	s.Helper()

@@ -1,8 +1,6 @@
-// Package main provides information about the application.
 package main
 
 import (
-	"assetgoblin/config"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"assetgoblin/config"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
@@ -46,6 +46,7 @@ const Logo = `
 
 // printConfig loads and prints the effective runtime configuration as a table.
 func printConfig() {
+	var conf config.Config
 	if err := conf.Load(); err != nil {
 		slog.Error("Failed to load config", "error", err)
 		os.Exit(1)
@@ -67,6 +68,7 @@ func printConfig() {
 		{"gob_file", config.GobFilePath()},
 		{"port", conf.Port},
 		{"public_dir", conf.PublicDir},
+		{"python_executable", conf.PythonExecutable},
 		{"secret", conf.Secret},
 		{"rate_limit.limit", strconv.Itoa(conf.RateLimit.Limit)},
 		{"rate_limit.ttl", conf.RateLimit.Ttl.String()},

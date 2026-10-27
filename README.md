@@ -17,12 +17,13 @@ weight: 1
 [![Latest Release](https://img.shields.io/github/v/release/sbolch/AssetGoblin.svg)](https://github.com/sbolch/AssetGoblin/releases)
 
 Serve static files and transform images through presets or URL parameters.
-Optional Lua plugins add audio, video and extra formats without rebuilding the server.
+Optional Python plugins add audio, video and extra formats without rebuilding the server.
 
 ## Requirements
 
  - Go 1.27.3 or newer (for building from source)
  - [ImageMagick](https://imagemagick.org) and/or [vips](https://www.libvips.org)
+ - Python 3.10+ (for Python plugins; select an interpreter with `python_executable` in configuration)
  - [FFmpeg](https://ffmpeg.org/download.html) (optional, for media transformations and QOI)
 
 ## Quick start
@@ -54,6 +55,10 @@ For a container deployment, see the [Docker guide](docs/container.md).
 
 The same documentation is available as a [GitHub Pages site](https://assetgoblin.sbolch.hu/).
 
+## External packages
+
+- [AssetGoblinLua](https://github.com/sybolch/AssetGoblinLua): Optional Lua 5.1 backend for custom builds.
+
 ## Acknowledgements
 
 AssetGoblin is built with the following open-source projects. Thank you to their
@@ -64,16 +69,12 @@ authors and contributors.
 |  | [Charm terminal utilities](https://github.com/charmbracelet/x/tree/main/term) | Terminal detection |
 | <img src="https://raw.githubusercontent.com/go-fuego/fuego/main/static/fuego.svg" width="64" alt="" loading="lazy" decoding="async"> | [Fuego](https://github.com/go-fuego/fuego) | HTTP server and routing |
 | 🥒 | [Gocuke](https://github.com/regen-network/gocuke) | Gherkin feature tests |
-|  | [GopherLua](https://github.com/yuin/gopher-lua) | Lua plugin runtime |
 | <img src="https://gohugo.io/images/hugo-logo-wide.svg" width="64" alt="" loading="lazy" decoding="async"> | [Hugo](https://gohugo.io/) | Documentation site generation |
 | <img src="https://github.com/user-attachments/assets/d13bbe1a-d2b2-4d18-9302-419a0bc3f579" width="64" alt="" loading="lazy" decoding="async"> | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Terminal styling and tables |
 | <img src="https://github.com/user-attachments/assets/acae9193-2974-41f3-808d-2d433f5ada5e" width="64" alt="" loading="lazy" decoding="async"> | [Viper](https://github.com/spf13/viper) | Configuration loading |
+| | [go-selfupdate](https://github.com/creativeprojects/go-selfupdate) | Verified executable updates |
+| | [go-limiter](https://github.com/sethvargo/go-limiter) | Per-IP HTTP rate limiting |
 
 ## Sponsors
 
 <a href="https://gazmag.hu" target="_blank"><img src="https://gazmag.hu/icon/logo-long.svg" alt="GazMag" height="50"></a>
-
-## Security patch v0.10.1
-
-Release v0.10.1 uses Go 1.27.3 and updates dependencies to address published
-Go vulnerability advisories. Build from source with Go 1.27.3 or newer.

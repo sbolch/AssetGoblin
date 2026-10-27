@@ -44,8 +44,23 @@ go test ./... -race
 Add or change the appropriate feature scenario when behavior changes. Go test
 functions serve as suite runners or subprocess fixtures; setup, actions and
 assertions belong in step implementations. Conversion scenarios skip only when
-their required tools are unavailable. CLI and release tests use a fake release
-transport and never contact GitHub or install updates.
+their required tools are unavailable. Image scenarios check decoded dimensions and pixels for resizing, crop positioning,
+flipping and color transformations. CLI and release tests use a fake release
+transport and never contact GitHub or modify the running executable.
+
+Configuration loading uses a separate Viper instance per load and publishes the
+new configuration after validation. CLI operations keep configuration and release
+metadata local. Production and server tests share `newServer`, including its codec
+registry and middleware. Use `slices.Clone` and `maps.Clone` when returning independent
+registries or lists; keep callback and close serialization at the runtime boundary.
+See [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) for general Go conventions.
+
+Self-updates use go-selfupdate with archive filters matching GoReleaser and mandatory
+`checksums.txt` verification. Updater feature scenarios use local HTTP fixtures and
+temporary executables; they never replace the test process or download live releases.
+Rate limiting uses go-limiter's in-memory fixed windows. Call the cleanup function
+returned by `newServer` after stopping the HTTP server to release its limiter store.
+
 
 ## Plugin integration checks
 
@@ -81,7 +96,7 @@ the Hugo site and cause a 404 at the home page. After changing the source, run t
 on `main` to publish Hugo. Keep the custom domain set to `assetgoblin.sbolch.hu`.
 The documentation workflow builds pull requests for validation and deploys
 pushes to `main` or a manual run on `main`. It publishes only documentation and
-site assets; application source and Lua scripts are excluded. The workflow uses
+site assets; application source and Python scripts are excluded. The workflow uses
 GitHub’s Pages actions; see [GitHub’s setup guide](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
 To preview locally, install [Hugo](https://gohugo.io/installation/) 0.167.0
@@ -99,7 +114,7 @@ hugo --destination _site --minify --panicOnWarning
 
 `hugo.toml` mounts the existing README, reference pages and plugin READMEs without
 copying them into a separate content folder. Only Markdown files are mounted from
-plugin folders; Lua files and application sources are never published. Page front
+plugin folders; Python files and application sources are never published. Page front
 matter defines titles, weights and stable URLs. `layouts/` contains the templates
 and link hook; `assets/docs.css` provides styling.
 Generated `_site` and Hugo build state are ignored. No Ruby, Bundler,

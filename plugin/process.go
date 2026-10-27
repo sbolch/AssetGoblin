@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -127,7 +128,7 @@ func runProcess(parent context.Context, source *os.File, identity, revision, cac
 	tempPath := temp.Name()
 	temp.Close()
 	defer os.Remove(tempPath)
-	args := append([]string(nil), plan.Args...)
+	args := slices.Clone(plan.Args)
 	for i, arg := range args {
 		if arg == "{input}" {
 			args[i] = inputPath

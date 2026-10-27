@@ -25,6 +25,7 @@ import (
 )
 
 type assetgoblinSuite struct {
+	serverCleanups    []func()
 	liveURL           string
 	liveStop          func()
 	pluginManager     *plugin.Manager
@@ -48,22 +49,6 @@ type assetgoblinSuite struct {
 	handler      http.Handler
 }
 
-func newSuite() *assetgoblinSuite {
-	return &assetgoblinSuite{
-		config: &config.Config{
-			Port:      "8080",
-			PublicDir: "testdata/public",
-			Image: config.Image{
-				Directory: "testdata/assets/img",
-				CacheDir:  "testdata/cache/img",
-				Formats:   []string{"jpg", "png"},
-				Path:      "/img/",
-				Presets:   map[string]utils.ImagePreset{},
-			},
-		},
-	}
-}
-
 func (s *assetgoblinSuite) cleanup() {
 	if s.liveStop != nil {
 		s.liveStop()
@@ -73,6 +58,14 @@ func (s *assetgoblinSuite) cleanup() {
 	if s.server != nil {
 		s.server.Close()
 		s.server = nil
+	}
+	for _, cleanup := range s.serverCleanups {
+		cleanup()
+	}
+	s.serverCleanups = nil
+	if s.ratelimit != nil {
+		s.ratelimit.Close()
+		s.ratelimit = nil
 	}
 	if s.pluginManager != nil {
 		s.pluginManager.Close()
@@ -316,10 +309,14 @@ func (s *assetgoblinSuite) ISendAGetRequestToWithoutAToken(path string) {
 }
 
 func (s *assetgoblinSuite) ARateLimitMiddlewareConfiguredForRequestsPerMinute(limit int64) {
-	s.ratelimit = middleware.NewRateLimit(&config.RateLimit{
+	var err error
+	s.ratelimit, err = middleware.NewRateLimit(&config.RateLimit{
 		Limit: int(limit),
 		Ttl:   time.Minute,
 	})
+	if err != nil {
+		s.Fatal(err)
+	}
 }
 
 func (s *assetgoblinSuite) ISendRequestsWithinTheWindow(count int64) {
@@ -357,10 +354,14 @@ func (s *assetgoblinSuite) AllRequestsShouldBeSuccessful() {
 }
 
 func (s *assetgoblinSuite) ARateLimitMiddlewareConfiguredForRequestsWithAMsWindow(limit int64, windowMs int64) {
-	s.ratelimit = middleware.NewRateLimit(&config.RateLimit{
+	var err error
+	s.ratelimit, err = middleware.NewRateLimit(&config.RateLimit{
 		Limit: int(limit),
 		Ttl:   time.Duration(windowMs) * time.Millisecond,
 	})
+	if err != nil {
+		s.Fatal(err)
+	}
 }
 
 func (s *assetgoblinSuite) ISendRequestsInRapidSuccession(count int64) {

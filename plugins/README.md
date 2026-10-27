@@ -14,7 +14,7 @@ url: /plugins/README.html
 </p>
 
 These examples ship with AssetGoblin but are optional, independently deployed
-Lua scripts. Their format rules and tool arguments live in the scripts.
+Python scripts. Their format rules and tool arguments live in the scripts.
 
 | Plugin | Extends | Tool dependency | Documentation |
 | --- | --- | --- | --- |
@@ -29,18 +29,19 @@ From the repository root, copy selected scripts into one flat directory:
 
 ```sh
 mkdir -p runtime-plugins
-cp plugins/audio/assetgoblin-audio.lua runtime-plugins/
-cp plugins/video/assetgoblin-video.lua runtime-plugins/
-cp plugins/qoi/assetgoblin-qoi.lua runtime-plugins/
-cp plugins/qoa/assetgoblin-qoa.lua runtime-plugins/
+cp plugins/audio/assetgoblin-audio.py runtime-plugins/
+cp plugins/video/assetgoblin-video.py runtime-plugins/
+cp plugins/qoi/assetgoblin-qoi.py runtime-plugins/
+cp plugins/qoa/assetgoblin-qoa.py runtime-plugins/
 go run . -serve -plugins-dir runtime-plugins
 ```
 
-For a built executable, copy selected Lua files beside it and restart with `-serve`.
+For a built executable, copy selected Python files beside it and restart with `-serve`.
 Discovery is nonrecursive: pointing at this catalog directory does not load scripts
 inside its subdirectories. QOA requires the audio script in the same discovery
 directory. Removing QOA restores the base audio plugin. Tool dependencies resolve
-on PATH when a transformation runs; no external Lua runtime is required.
+on PATH when a transformation runs. Install Python 3.10+ on PATH, or use
+`-python` to select an interpreter (including a virtual environment).
 
 Asset directories are relative to the server working directory, not this example
 folder. Edit each route's `directory` in its script if needed.

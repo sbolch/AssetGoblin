@@ -3,7 +3,6 @@ Feature: Image discovery and transformation options
     When size "<input>" is selected with fit "<fit>"
     Then the resize geometry should be "<geometry>" with sizing "<sized>"
     And the selected fit should be "<selected>"
-    And the selection should be a preset "false"
 
     Examples:
       | input    | fit   | geometry | sized | selected |
@@ -22,7 +21,6 @@ Feature: Image discovery and transformation options
     Given preset "custom" has settings <settings>
     When size "custom" is selected with fit "<fit>"
     Then the resize geometry should be "<geometry>" with sizing "true"
-    And the selection should be a preset "true"
     And the transformation settings should match <settings>
 
     Examples:
@@ -41,7 +39,6 @@ Feature: Image discovery and transformation options
     Given preset "custom" has settings {"width":200,"height":200}
     When size "800" is selected with fit ""
     Then the resize geometry should be "800" with sizing "true"
-    And the selection should be a preset "false"
 
   Scenario Outline: Sources are discovered in configured format order
     Given supported source formats "<formats>"
@@ -88,3 +85,29 @@ Feature: Image discovery and transformation options
   Scenario: Absolute paths retain their location
     When an absolute image path is resolved
     Then it should retain its absolute location
+
+  Scenario Outline: Transformations produce the requested image dimensions and pixels
+    Given a four-color image source
+    When image URL "<url>" is requested
+    Then the image should be <width> by <height> with first pixel "<pixel>"
+
+    Examples:
+      | url                                                 | width | height | pixel       |
+      | /img/50/colors.png                                  | 50    | 40     | 255,0,0     |
+      | /img/50x20/colors.png                               | 25    | 20     | 255,0,0     |
+      | /img/50x20/colors.png?fit=cover                     | 50    | 20     | 255,0,0     |
+      | /img/50/colors.png?rotate=90                        | 40    | 50     | 0,0,255     |
+      | /img/50/colors.png?flip=horizontal                  | 50    | 40     | 0,255,0     |
+      | /img/50/colors.png?flip=vertical                    | 50    | 40     | 0,0,255     |
+      | /img/50/colors.png?flip=both                        | 50    | 40     | 255,255,0   |
+      | /img/50/colors.png?filter=invert                    | 50    | 40     | 0,255,255   |
+      | /img/50/colors.png?brightness=100                   | 50    | 40     | 255,255,255 |
+      | /img/50/colors.png?brightness=10&contrast=20         | 50    | 40     |             |
+      | /img/50/colors.png?filter=grayscale                 | 50    | 40     | gray        |
+      | /img/10x40/colors.png?fit=cover&crop=top-left        | 10    | 40     | 255,0,0     |
+      | /img/10x40/colors.png?fit=cover&crop=top-right       | 10    | 40     | 0,255,0     |
+
+  Scenario: Canceled requests do not launch image converters
+    Given a four-color image source
+    When image URL "/img/50/colors.png" is requested after cancellation
+    Then the image response status should be 500

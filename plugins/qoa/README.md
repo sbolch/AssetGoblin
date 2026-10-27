@@ -6,8 +6,8 @@ url: /plugins/qoa/README.html
 
 # QOA audio extension
 
-Deploy `assetgoblin-qoa.lua` **together with**
-`assetgoblin-audio.lua` in the same flat discovery directory and restart AssetGoblin.
+Deploy `assetgoblin-qoa.py` **together with**
+`assetgoblin-audio.py` in the same flat discovery directory and restart AssetGoblin.
 This extension keeps `/a/` and the audio plugin's configured directory. It adds
 QOA input/output while reusing the parent's trim, volume and validation logic.
 The base audio plugin continues to work independently when this extension is absent.
@@ -25,7 +25,7 @@ cc qoaconv.c -std=gnu99 -O3 -lm -o qoaconv
 ```
 
 On Windows, build the same converter with a compatible C toolchain as `qoaconv.exe`
-and add its directory to PATH. No compilation of AssetGoblin or the Lua script is
+and add its directory to PATH. No compilation of AssetGoblin or the Python script is
 needed. The minimal reference build converts QOA and PCM WAV; FFmpeg handles the
 base audio plugin's other formats.
 

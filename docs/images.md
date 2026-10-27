@@ -33,13 +33,18 @@ http://localhost:8080/img/640x480/path/to/image.jpg
 http://localhost:8080/img/800x600/path/to/image.png?fit=cover
 ```
 
+Basic resizing uses vips when available, with ImageMagick as a fallback.
+Rotation, flipping, crop positioning, brightness, contrast, gamma and filters use
+ImageMagick. Install ImageMagick to use these transformations. Image processing
+commands stop when their request context is canceled.
+
 ## Transformation options
 
 - `fit=contain` (default): Image is resized to fit within the dimensions while preserving aspect ratio
 - `fit=cover`: Image is resized to cover the entire dimensions, cropping excess (center-aligned)
 - `rotate`: Rotation in degrees (0, 90, 180, 270)
 - `flip`: Flip image (`horizontal`, `vertical`, `both`)
-- `crop`: Crop region (`top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, `bottom-right`)
+- `crop`: Crop position for `fit=cover` with both width and height (`top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom`, `bottom-right`)
 - `brightness`: Brightness adjustment (-100 to 100)
 - `contrast`: Contrast adjustment (-100 to 100)
 - `gamma`: Gamma adjustment (0.1 to 10.0)
@@ -60,3 +65,7 @@ http://localhost:8080/img/800x600/path/to/image.png?fit=cover
   - `oil`: Oil painting effect (stronger)
   - `sketch`: Sketch effect
   - `vignette`: Vignette effect
+
+Image results are cached. When upgrading from an older version or changing a
+preset, clear the affected image cache to regenerate existing results; `-clear-gob`
+clears only the configuration cache.

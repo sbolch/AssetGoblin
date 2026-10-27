@@ -7,7 +7,7 @@ url: /plugins/video/README.html
 # Video plugin
 
 Serves `/v/` from `assets/video`, relative to the server working
-directory. Edit `directory` in `assetgoblin-video.lua` to change the source root.
+directory. Edit `directory` in `assetgoblin-video.py` to change the source root.
 See [deployment](../README.md#deployment) for copying scripts and restarting.
 The script owns its formats, validation, codecs and FFmpeg arguments.
 

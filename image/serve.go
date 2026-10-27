@@ -1,5 +1,3 @@
-// Package image provides functionality for processing and serving images.
-// It supports resizing images to different presets and converting between formats.
 package image
 
 import (
@@ -9,27 +7,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 )
 
-type FitMode string
-
-const (
-	FitModeContain FitMode = "contain"
-	FitModeCover   FitMode = "cover"
-)
-
-// Serve handles HTTP requests for images, processing them according to the requested preset.
-// It extracts the preset name and image path from the URL, finds the image file,
-// resizes it according to the preset with optional transforms (rotate, flip, brightness, contrast, gamma, filters),
-// caches the result, and serves it to the client.
-// If the image is already cached, it serves the cached version directly.
-// The URL format should be: /[base_path]/[preset_name]/[image_path]
-// Alternatively, direct dimensions can be used: /[base_path]/[width]/[image_path] or /[base_path]/[width]x[height]/[image_path]
-// Query parameters: fit, rotate, flip, crop, brightness, contrast, gamma, filter
+// Serve resolves a preset or dimensions, applies validated query transformations,
+// and serves the cached image. Registered codecs bridge plugin formats through PNG.
 func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	slog.Info("Request received", "method", req.Method, "path", req.URL.Path, "remote", req.RemoteAddr, "user-agent", req.UserAgent())
 
@@ -53,7 +36,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	requestedExt := strings.ToLower(filepath.Ext(requestedPath))
 
 	outputCodec := s.Codecs[strings.TrimPrefix(requestedExt, ".")]
-	if outputCodec == nil && !slices.Contains(s.Config.Formats, strings.TrimPrefix(requestedExt, ".")) {
+	if outputCodec == nil && !s.isValidFormat(requestedExt) {
 		http.Error(res, "Unsupported format: "+requestedExt, http.StatusBadRequest)
 		return
 	}
@@ -64,8 +47,8 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	queryFlip := query.Get("flip")
 	queryCrop := query.Get("crop")
 
-	resizeOption, sizeParts, isPreset := parseSize(presetOrSizes, queryFit, s.Config.Presets)
-	if resizeOption == "" && !isPreset {
+	resizeOption, parts := parseSize(presetOrSizes, queryFit, s.Config.Presets)
+	if resizeOption == "" {
 		http.Error(res, "Unsupported preset or size: "+presetOrSizes, http.StatusBadRequest)
 		return
 	}
@@ -73,12 +56,12 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	if queryRotate != "" {
 		r, err := strconv.Atoi(queryRotate)
 		if err == nil && (r == 0 || r == 90 || r == 180 || r == 270) {
-			sizeParts.rotate = r
+			parts.Rotate = r
 		}
 	}
 	if queryFlip != "" {
 		if queryFlip == "horizontal" || queryFlip == "vertical" || queryFlip == "both" {
-			sizeParts.flip = queryFlip
+			parts.Flip = queryFlip
 		}
 	}
 	if queryCrop != "" {
@@ -94,7 +77,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 			"bottom-right": true,
 		}
 		if validCrops[queryCrop] {
-			sizeParts.crop = queryCrop
+			parts.Crop = queryCrop
 		}
 	}
 	queryBrightness := query.Get("brightness")
@@ -103,13 +86,13 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 	filterStr := query.Get("filter")
 
 	if b, err := strconv.ParseFloat(queryBrightness, 64); err == nil && b >= -100 && b <= 100 {
-		sizeParts.brightness = b
+		parts.Brightness = b
 	}
 	if c, err := strconv.ParseFloat(queryContrast, 64); err == nil && c >= -100 && c <= 100 {
-		sizeParts.contrast = c
+		parts.Contrast = c
 	}
 	if g, err := strconv.ParseFloat(queryGamma, 64); err == nil && g >= 0.1 && g <= 10.0 {
-		sizeParts.gamma = g
+		parts.Gamma = g
 	}
 
 	if filterStr != "" {
@@ -136,7 +119,7 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		for _, f := range queryFilters {
 			f = strings.TrimSpace(f)
 			if validFilters[f] {
-				sizeParts.filters = append(sizeParts.filters, f)
+				parts.Filters = append(parts.Filters, f)
 			}
 		}
 	}
@@ -188,30 +171,27 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 		revision += outputCodec.Revision()
 	}
 
-	cacheKey := presetOrSizes
-	if sizeParts.hasSize {
-		cacheKey = presetOrSizes + "_" + string(sizeParts.fit)
+	cacheKey := presetOrSizes + "_" + parts.Fit
+	if parts.Rotate > 0 {
+		cacheKey += "_r" + strconv.Itoa(parts.Rotate)
 	}
-	if sizeParts.rotate > 0 {
-		cacheKey += "_r" + strconv.Itoa(sizeParts.rotate)
+	if parts.Flip != "" {
+		cacheKey += "_f" + parts.Flip
 	}
-	if sizeParts.flip != "" {
-		cacheKey += "_f" + sizeParts.flip
+	if parts.Brightness != 0 {
+		cacheKey += "_b" + strconv.FormatFloat(parts.Brightness, 'f', -1, 64)
 	}
-	if sizeParts.brightness != 0 {
-		cacheKey += "_b" + strconv.FormatFloat(sizeParts.brightness, 'f', -1, 64)
+	if parts.Contrast != 0 {
+		cacheKey += "_c" + strconv.FormatFloat(parts.Contrast, 'f', -1, 64)
 	}
-	if sizeParts.contrast != 0 {
-		cacheKey += "_c" + strconv.FormatFloat(sizeParts.contrast, 'f', -1, 64)
+	if parts.Gamma > 0 && parts.Gamma != 1.0 {
+		cacheKey += "_g" + strconv.FormatFloat(parts.Gamma, 'f', -1, 64)
 	}
-	if sizeParts.gamma > 0 && sizeParts.gamma != 1.0 {
-		cacheKey += "_g" + strconv.FormatFloat(sizeParts.gamma, 'f', -1, 64)
+	if len(parts.Filters) > 0 {
+		cacheKey += "_" + strings.Join(parts.Filters, ",")
 	}
-	if len(sizeParts.filters) > 0 {
-		cacheKey += "_" + strings.Join(sizeParts.filters, ",")
-	}
-	if sizeParts.crop != "" {
-		cacheKey += "_crop" + sizeParts.crop
+	if parts.Crop != "" {
+		cacheKey += "_crop" + parts.Crop
 	}
 
 	processingExt := requestedExt
@@ -237,17 +217,13 @@ func (s *Service) Serve(res http.ResponseWriter, req *http.Request) {
 
 		vipsEncoded := false
 		if requestedExt != ".avif" || s.Config.AvifThroughVips {
-			cmd := buildVipsCommand(foundPath, finalPath, resizeOption, sizeParts)
-			if err = cmd.Run(); err == nil {
+			cmd := buildVipsCommand(req.Context(), foundPath, finalPath, parts)
+			if cmd != nil && cmd.Run() == nil {
 				vipsEncoded = true
 			}
 		}
 		if !vipsEncoded {
-			prefix := ""
-			if runtime.GOOS == "windows" {
-				prefix = "magick "
-			}
-			cmd := buildConvertCommand(prefix, foundPath, finalPath, resizeOption, sizeParts)
+			cmd := buildConvertCommand(req.Context(), foundPath, finalPath, resizeOption, parts)
 			if err = cmd.Run(); err != nil {
 				slog.Error("Error while converting image", "error", err)
 				http.Error(res, "Error while converting image", http.StatusInternalServerError)

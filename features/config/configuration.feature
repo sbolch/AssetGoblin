@@ -61,3 +61,50 @@ Feature: Configuration and persistent cache
   Scenario: Cache location uses the OS user cache directory
     When the default cache directory is resolved
     Then it should be the application directory under the OS user cache
+
+  Scenario Outline: Python interpreter configuration survives caching
+    Given the configuration file contains {"python_executable":"<executable>"}
+    When configuration is loaded
+    Then the Python executable should be "<executable>"
+    When configuration is read directly from the gob cache
+    Then the Python executable should be "<executable>"
+
+    Examples:
+      | executable |
+      | |
+      | /opt/plugin environment/bin/python |
+
+  Scenario: Reloading replaces fields removed from disk configuration
+    Given the configuration file contains {"python_executable":"/old/python", "public_dir":"old-public"}
+    When configuration is loaded
+    And the gob cache is removed
+    Given the configuration file contains {"port":"9092"}
+    When configuration is loaded
+    Then the configured port should be "9092"
+    And the Python executable should be ""
+    And the public directory should be "public"
+
+  Scenario: Presets default to contain sizing and neutral gamma
+    Given the configuration file contains {"image":{"presets":{"small":{"width":100}}}}
+    When configuration is loaded
+    Then configuration should be marked as loaded from disk
+    And preset "small" should have settings {"width":100,"fit":"contain","gamma":1}
+    When configuration is read directly from the gob cache
+    Then preset "small" should have settings {"width":100,"fit":"contain","gamma":1}
+
+  Scenario Outline: Invalid preset values fail configuration loading
+    Given the configuration file contains {"image":{"presets":{"invalid":<preset>}}}
+    When configuration is loaded
+    Then configuration loading should fail
+
+    Examples:
+      | preset |
+      | {"width":0} |
+      | {"width":100,"rotate":45} |
+      | {"width":100,"flip":"diagonal"} |
+      | {"width":100,"crop":"unknown"} |
+      | {"width":100,"brightness":101} |
+      | {"width":100,"contrast":-101} |
+      | {"width":100,"gamma":0.05} |
+      | {"width":100,"gamma":11} |
+      | {"width":100,"filters":["unknown"]} |

@@ -28,5 +28,5 @@ Feature: Plugin composition and cache revisions
 
     Examples:
       | source                                                                   |
-      | return {api_version=1,extends='base'}                                    |
-      | return {api_version=1,extends='base',extend=function(p)return false end} |
+      | plugin = {'api_version': 1, 'extends': 'base'}                                    |
+      | plugin = {'api_version': 1, 'extends': 'base', 'extend': lambda p: False} |

@@ -7,8 +7,10 @@ url: /docs/container.html
 # Docker
 
 The container package is `ghcr.io/sbolch/assetgoblin`, with Linux amd64 and arm64
-images. The container workflow publishes `edge` from `main`, version and
-major/minor tags from `v*` release tags, and `latest` from stable version tags.
+images. The runtime uses Alpine Linux with Python, media tools and CA
+certificates installed through its package manager. The container workflow publishes
+`edge` from `main`, version and major/minor tags from `v*` release tags, and `latest`
+from stable version tags.
 Pull requests build without publishing. Tags are available after the workflow
 successfully publishes them; use a version or digest for repeatable deployments.
 
@@ -16,40 +18,41 @@ successfully publishes them; use a version or digest for repeatable deployments.
 
 ```sh
 docker run --rm -p 8080:8080 \
-  --mount type=bind,src="$PWD/assets",dst=/app/assets,readonly \
-  --mount type=bind,src="$PWD/public",dst=/app/public,readonly \
-  --mount type=volume,src=assetgoblin-cache,dst=/cache \
+  --mount type=bind,src="$PWD/assets",dst=/srv/assetgoblin/assets,readonly \
+  --mount type=bind,src="$PWD/public",dst=/srv/assetgoblin/public,readonly \
+  --mount type=volume,src=assetgoblin-cache,dst=/var/cache/assetgoblin \
   ghcr.io/sbolch/assetgoblin:latest
 ```
 
 Create the host asset and public directories before running. The default command
-starts the server on port 8080. ImageMagick, vips, FFmpeg and CA certificates are
-included. The image runs as UID/GID `10001:10001`; mounted files must be readable by
+starts the server on port 8080. Python 3, virtual-environment support, ImageMagick,
+vips, FFmpeg and CA certificates are included. The image runs as UID/GID `10001:10001`; mounted files must be readable by
 that user, and any custom cache directory must be writable. The default working
-directory is `/app`, so the standard `assets/img` and `public` paths work unchanged.
+directory is `/srv/assetgoblin`, so the standard `assets/img` and `public` paths
+work unchanged.
 
 ## Configuration and cache
 
-Mount a configuration file at `/app/config.json` (or another supported configuration
-filename). For example, add this option to the run command:
+Mount a configuration file at `/etc/assetgoblin/config.json` (or another supported
+configuration filename). For example, add this option to the run command:
 
 ```sh
---mount type=bind,src="$PWD/config.json",dst=/app/config.json,readonly
+--mount type=bind,src="$PWD/config.json",dst=/etc/assetgoblin/config.json,readonly
 ```
 
-The configuration and transformation caches live under `/cache/assetgoblin`.
+The configuration and transformation caches live under `/var/cache/assetgoblin`.
 A named cache volume preserves them across container replacements. After changing
 configuration, clear the gob cache using the same volume before restarting:
 
 ```sh
 docker run --rm \
-  --mount type=volume,src=assetgoblin-cache,dst=/cache \
+  --mount type=volume,src=assetgoblin-cache,dst=/var/cache/assetgoblin \
   ghcr.io/sbolch/assetgoblin:latest -clear-gob
 ```
 
 Passing arguments replaces the default command. To use custom server arguments,
-include `-serve -plugins-dir /plugins` explicitly. If you change the configured
-port, adjust the published container port too. See [configuration](configuration.md)
+include `-serve -plugins-dir /usr/local/lib/assetgoblin/plugins` explicitly. If you
+change the configured port, adjust the published container port too. See [configuration](configuration.md)
 and [CLI options](cli.md) for application settings.
 
 ## Optional plugins
@@ -58,13 +61,13 @@ Copy selected scripts into a flat host directory using the
 [plugin deployment instructions](../plugins/README.md#deployment), then mount it:
 
 ```sh
---mount type=bind,src="$PWD/runtime-plugins",dst=/plugins,readonly
+--mount type=bind,src="$PWD/runtime-plugins",dst=/usr/local/lib/assetgoblin/plugins,readonly
 ```
 
-The default command discovers scripts in `/plugins` at startup. No example
-plugins are enabled in the image. FFmpeg supports the audio, video and QOI
+The default command discovers scripts in `/usr/local/lib/assetgoblin/plugins` at
+startup. No example plugins are enabled in the image. FFmpeg supports the audio, video and QOI
 examples; QOA additionally requires `qoaconv`, which is not bundled. Build a derived
-image with that tool to use QOA. See the [plugin catalog](../plugins/README.md)
+image with that tool to use QOA (see [runtime dependencies](#runtime-dependencies)). See the [plugin catalog](../plugins/README.md)
 for each plugin’s requirements. Deploy trusted scripts; their tools execute with
 the container user’s permissions.
 
@@ -80,6 +83,30 @@ sources out of the runtime image. Optional build arguments `VERSION`, `BUILD_TIM
 and `GIT_COMMIT` populate the same metadata as binary releases. Update containers
 by pulling a new image and recreating them, rather than using `-update` inside an
 existing container.
+
+## Runtime dependencies
+
+The runtime stage installs Alpine packages with `apk add --no-cache`. Python
+includes virtual-environment support and pip; ImageMagick, vips and FFmpeg provide
+image and media transformations. Timezone data and CA certificates are included.
+
+To add a tool or native plugin dependency, extend the `apk add` package list or
+build a derived image. Package installation requires root; return to the service
+user after installing dependencies:
+
+```dockerfile
+FROM ghcr.io/sbolch/assetgoblin:latest
+USER root
+RUN apk add --no-cache <package-name>
+USER 10001:10001
+```
+
+For diagnostics, use `docker logs`. For example, inspect the Python TLS runtime:
+
+```sh
+docker run --rm --entrypoint /usr/bin/python3 assetgoblin:local \
+  -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+```
 
 ## GitHub Container Registry
 

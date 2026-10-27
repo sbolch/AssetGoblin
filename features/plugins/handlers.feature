@@ -1,4 +1,4 @@
-Feature: Root-scoped plugin files and Lua callbacks
+Feature: Root-scoped plugin files and Python callbacks
   Scenario Outline: File plugins honor HTTP semantics and reject unsafe paths
     Given a rooted file plugin with sample content "abcdef"
     When a plugin "<method>" request is sent to "<path>" with range "<range>"
@@ -32,7 +32,7 @@ Feature: Root-scoped plugin files and Lua callbacks
     And the same request is made with its last-modified condition
     Then the plugin response status should be 304
 
-  Scenario: A Lua callback receives method, path, query and headers
+  Scenario: A Python callback receives method, path, query and headers
     Given a custom callback with a persistent counter
     And request header "X-Test" is "value"
     When a plugin "GET" request is sent to "/custom/hello?name=world" with range ""
@@ -62,12 +62,12 @@ Feature: Root-scoped plugin files and Lua callbacks
     When a plugin "GET" request is sent to "/custom/file" with range "bytes=1-3"
     Then the plugin response body should be "bcd"
 
-  Scenario: Cancellation releases the interpreter for subsequent requests
+  Scenario: Cancellation terminates the Python worker
     Given a custom callback with a persistent counter
     When a looping callback request is cancelled
     Then the plugin response status should be 500
     When a plugin "GET" request is sent to "/custom/hello" with range ""
-    Then the plugin response status should be 201
+    Then the plugin response status should be 500
 
   Scenario: Closing the plugin manager is idempotent and disables callbacks
     Given a custom callback with a persistent counter

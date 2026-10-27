@@ -1,33 +1,34 @@
 package main
 
 import (
-	"assetgoblin/config"
-	"assetgoblin/image"
-	"assetgoblin/middleware"
-	"assetgoblin/plugin"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	pathpkg "path"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
+
+	"assetgoblin/config"
+	"assetgoblin/image"
+	"assetgoblin/middleware"
+	"assetgoblin/plugin"
 
 	"github.com/go-fuego/fuego"
 )
 
 // newServer builds the production server without opening a listener.
-func newServer(cfg *config.Config, pluginHandlers ...plugin.RouteHandler) (*fuego.Server, error) {
-	return newServerWithCodecs(cfg, nil, pluginHandlers...)
-}
-
-func newServerWithCodecs(cfg *config.Config, codecs map[string]image.Codec, pluginHandlers ...plugin.RouteHandler) (*fuego.Server, error) {
+// Call cleanup after stopping the server to release middleware resources.
+func newServer(cfg *config.Config, codecs map[string]image.Codec, pluginHandlers ...plugin.RouteHandler) (*fuego.Server, func(), error) {
 	wd, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("working directory: %w", err)
+		return nil, nil, fmt.Errorf("working directory: %w", err)
 	}
 	srv := fuego.NewServer(
 		fuego.WithAddr(":"+cfg.Port),
@@ -52,12 +53,12 @@ func newServerWithCodecs(cfg *config.Config, codecs map[string]image.Codec, plug
 	if len(cfg.Image.Formats) > 0 {
 		service := &image.Service{Config: &cfg.Image, Codecs: codecs}
 		if err := register(cfg.Image.Path, service.Serve); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	for _, plugin := range pluginHandlers {
 		if err := register(plugin.Path(), plugin.Handler()); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	publicDir := cfg.PublicDir
@@ -65,12 +66,22 @@ func newServerWithCodecs(cfg *config.Config, codecs map[string]image.Codec, plug
 		publicDir = filepath.Join(wd, publicDir)
 	}
 	fuego.GetStd(srv, "/", http.FileServer(http.Dir(publicDir)).ServeHTTP, fuego.OptionHide())
+	cleanup := func() {}
 	var middlewares []func(http.Handler) http.Handler
 	if cfg.Secret != "" {
 		middlewares = append(middlewares, (&middleware.Signkey{Secret: cfg.Secret}).Verify)
 	}
 	if cfg.RateLimit.Limit > 0 {
-		middlewares = append(middlewares, middleware.NewRateLimit(&cfg.RateLimit).Limit)
+		limiter, err := middleware.NewRateLimit(&cfg.RateLimit)
+		if err != nil {
+			return nil, nil, err
+		}
+		cleanup = func() {
+			if err := limiter.Close(); err != nil {
+				slog.Error("Failed to close rate limiter", "error", err)
+			}
+		}
+		middlewares = append(middlewares, limiter.Limit)
 	}
 	fuego.WithGlobalMiddlewares(middlewares...)(srv)
 	// Apply Fuego's global middleware order to the handler used by tests too.
@@ -79,11 +90,12 @@ func newServerWithCodecs(cfg *config.Config, codecs map[string]image.Codec, plug
 		srv.Handler = wrap(srv.Handler)
 	}
 
-	return srv, nil
+	return srv, cleanup, nil
 }
 
 // serve loads configuration and starts the Fuego HTTP server.
-func serve() {
+func serve(pluginsDir string) {
+	var conf config.Config
 	if err := conf.Load(); err != nil {
 		slog.Error("Failed to load config", "error", err)
 		os.Exit(1)
@@ -92,30 +104,36 @@ func serve() {
 		slog.Error("Invalid port", "port", conf.Port)
 		os.Exit(1)
 	}
-	manager, err := loadPlugins(pluginsDir)
+	manager, err := loadPlugins(pluginsDir, conf.PythonExecutable)
 	if err != nil {
 		slog.Error("Failed to load plugins", "error", err)
 		os.Exit(1)
 	}
 	defer manager.Close()
-	srv, err := newServerWithCodecs(&conf, manager.ImageCodecs(), manager.Handlers()...)
+	handlers, imageCodecs := manager.Handlers(), manager.ImageCodecs()
+	srv, cleanup, err := newServer(&conf, imageCodecs, handlers...)
 	if err != nil {
 		slog.Error("Failed to configure server", "error", err)
 		os.Exit(1)
 	}
-	routes := make([]string, 0, len(manager.Handlers()))
-	for _, handler := range manager.Handlers() {
+	defer cleanup()
+	routes := make([]string, 0, len(handlers))
+	for _, handler := range handlers {
 		routes = append(routes, handler.Path())
 	}
-	codecs := make([]string, 0, len(manager.ImageCodecs()))
-	for name := range manager.ImageCodecs() {
+	codecs := make([]string, 0, len(imageCodecs))
+	for name := range imageCodecs {
 		codecs = append(codecs, name)
 	}
 	printServerSummary(os.Stdout, &conf, srv.Addr, routes, codecs)
 	slog.Info("Starting server", "port", conf.Port)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	// Fuego applies the same middleware chain when starting the listener.
-	if err := srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := srv.RunContext(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("Server failed to start", "error", err)
+		cleanup()
+		manager.Close()
 		os.Exit(1)
 	}
 }

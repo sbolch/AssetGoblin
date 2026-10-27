@@ -15,12 +15,19 @@ url: /docs/security.html
 
 ## Rate limiting
 
-The rate limiter counts requests per client IP. Accepted requests extend the inactivity
-window; the count resets after no accepted request for the configured TTL. Rejected
-requests do not extend the window. All paths share the same per-IP allowance.
+The rate limiter uses go-limiter's in-memory store to count requests per client IP
+in fixed windows. Each IP's first request starts its window; the allowance resets
+at each configured interval, even when requests continue arriving. All paths share
+the same per-IP allowance. The client address comes from the socket, ignoring
+forwarding headers and port changes.
+
+Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`X-RateLimit-Reset`. Requests exceeding the allowance return HTTP 429 with
+`Retry-After`. Reset and retry times use HTTP dates in GMT. Limits are local to
+each server process. The server closes the store and its cleanup worker on shutdown.
 
 Configure `rate_limit.limit` as the maximum accepted request count and
-`rate_limit.ttl` as the inactivity duration, using Go's `time.ParseDuration`
+`rate_limit.ttl` as the positive window duration, using Go's `time.ParseDuration`
 syntax (for example `1m`). Set `limit` to `0` to disable rate limiting.
 
 ## Signed URLs

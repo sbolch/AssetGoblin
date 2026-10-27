@@ -6,7 +6,7 @@ url: /plugins/qoi/README.html
 
 # QOI image codec plugin
 
-Deploy `assetgoblin-qoi.lua` using the [shared instructions](../README.md#deployment). Install FFmpeg on PATH with its `qoi` encoder
+Deploy `assetgoblin-qoi.py` using the [shared instructions](../README.md#deployment). Install FFmpeg on PATH with its `qoi` encoder
 and decoder (`ffmpeg -encoders` and `ffmpeg -decoders` list available codecs).
 The core image backend still requires ImageMagick or libvips.
 

@@ -33,11 +33,20 @@ whether it was loaded from gob cache, and the gob cache file path.
 
 ## -update
 
-Update to the latest version. A progress bar shows downloaded bytes and
+Update the installed executable to the latest compatible stable release using
+[go-selfupdate](https://github.com/creativeprojects/go-selfupdate). Drafts and
+prereleases are ignored, and released builds never downgrade. Development builds
+can update too. The updater selects the platform archive, verifies its SHA-256
+against the release's `checksums.txt`, and replaces the running executable's
+resolved installation path. Failed downloads or checksum validation leave the
+installed executable intact. The install directory must be writable. Bundled
+support files and separately installed plugins are not updated by this command.
+
+A progress bar shows downloaded bytes and
 percentage when the server supplies the archive size; otherwise it shows the byte
 count. Terminal output refreshes in place, while redirected output prints only
-the initial and final download lines. Checksum verification, extraction and
-installation are reported as separate stages. Download failures use red styling;
+the initial and final download lines. Installation success is reported after
+checksum verification and executable replacement. Download failures use red styling;
 release notes appear under a heading and wrap to the terminal width (up to 80
 columns). Release notes retain their original Markdown text.
 
@@ -47,11 +56,11 @@ Print version info
 
 ## -plugins-dir
 
-Override the Lua plugin discovery directory. See [plugin deployment](plugins.md#runtime-plugins).
+Override the Python plugin discovery directory. See [plugin deployment](plugins.md#runtime-plugins).
 
 ## Terminal formatting
 
 The logo, help and configuration tables, version details, success messages and update
 notices use terminal-aware layout and color. Colors adapt to the output terminal,
 are removed for redirected output, and respect `NO_COLOR`. Update notices appear
-only after a successful release check reports a different version.
+only after a successful release check finds a compatible newer stable release (or a stable release for a development build).

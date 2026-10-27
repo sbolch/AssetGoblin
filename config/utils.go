@@ -24,9 +24,7 @@ func RemoveGobFile() error {
 	return nil
 }
 
-// saveGob serializes the Config struct to a gob file for faster loading in the future.
-// It returns an error if the file cannot be created or if the encoding fails.
-// If the file cannot be created, it logs a warning and returns nil to allow the application to continue.
+// saveGob caches configuration. An unwritable cache is optional; encoding errors are returned.
 func (config *Config) saveGob() error {
 	if err := os.MkdirAll(defaultCacheDir(), 0755); err != nil {
 		slog.Warn("Failed to create cache directory", "error", err)
@@ -40,16 +38,13 @@ func (config *Config) saveGob() error {
 	}
 	defer utils.CloseFile(file)
 
-	encoder := gob.NewEncoder(file)
-	if err = encoder.Encode(config); err != nil {
+	if err = gob.NewEncoder(file).Encode(config); err != nil {
 		return fmt.Errorf("unable to encode config: %w", err)
 	}
 
 	return nil
 }
 
-// loadGob deserializes the Config struct from a gob file.
-// It returns an error if the file cannot be opened or if the decoding fails.
 func (config *Config) loadGob() error {
 	file, err := os.Open(GobFilePath())
 	if err != nil {
@@ -57,15 +52,14 @@ func (config *Config) loadGob() error {
 	}
 	defer utils.CloseFile(file)
 
-	decoder := gob.NewDecoder(file)
-	if err = decoder.Decode(config); err != nil {
+	if err = gob.NewDecoder(file).Decode(config); err != nil {
 		return fmt.Errorf("unable to decode config file: %w", err)
 	}
 
 	return nil
 }
 
-// normalizePresets normalizes presets by setting default Fit value and validates all preset fields.
+// normalizePresets validates all presets before replacing them with normalized copies.
 func (config *Config) normalizePresets() error {
 	if config.Image.Presets == nil {
 		return nil
@@ -105,7 +99,7 @@ func (config *Config) normalizePresets() error {
 		"vignette":  true,
 	}
 
-	normalized := make(map[string]utils.ImagePreset)
+	normalized := make(map[string]utils.ImagePreset, len(config.Image.Presets))
 	for name, p := range config.Image.Presets {
 		if p.Width <= 0 {
 			return fmt.Errorf("preset %q: width is required and must be greater than 0", name)
@@ -127,6 +121,9 @@ func (config *Config) normalizePresets() error {
 		}
 		if p.Contrast < -100 || p.Contrast > 100 {
 			return fmt.Errorf("preset %q: contrast must be between -100 and 100", name)
+		}
+		if p.Gamma == 0 {
+			p.Gamma = 1
 		}
 		if p.Gamma < 0.1 || p.Gamma > 10.0 {
 			return fmt.Errorf("preset %q: gamma must be between 0.1 and 10.0", name)

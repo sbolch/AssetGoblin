@@ -1,23 +1,26 @@
 package main
 
 import (
-	"assetgoblin/config"
-	"assetgoblin/utils"
 	"bytes"
-	"charm.land/lipgloss/v2"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/regen-network/gocuke"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"charm.land/lipgloss/v2"
+	"github.com/regen-network/gocuke"
+
+	"assetgoblin/config"
+	"assetgoblin/utils"
 )
 
 // TestCLIProcessHelper is a subprocess harness; scenarios define every CLI assertion.
@@ -31,7 +34,10 @@ func TestCLIProcessHelper(t *testing.T) {
 	}
 	flag.CommandLine = flag.NewFlagSet("assetgoblin", flag.ExitOnError)
 	os.Args = append([]string{"assetgoblin"}, args...)
-	transport := releaseTransport{Status: 200, Body: `{"tag_name":"development","assets":[]}`}
+	transport := releaseTransport{Status: 200, Body: `{"tag_name":"v1.0.0","assets":[]}`}
+	if version := os.Getenv("ASSETGOBLIN_CLI_VERSION"); version != "" {
+		Version = version
+	}
 	if value := os.Getenv("ASSETGOBLIN_CLI_RELEASE"); value != "" {
 		if err := json.Unmarshal([]byte(value), &transport); err != nil {
 			os.Exit(3)
@@ -39,6 +45,7 @@ func TestCLIProcessHelper(t *testing.T) {
 	}
 	http.DefaultTransport = transport
 	main()
+	os.Exit(0)
 }
 func TestApplicationFeatures(t *testing.T) {
 	feature, err := filepath.Abs("features/application/*.feature")
@@ -56,12 +63,14 @@ func TestApplicationFeatures(t *testing.T) {
 	gocuke.NewRunner(t, &applicationSuite{}).Path(feature).Before((*applicationSuite).Before).After((*applicationSuite).After).
 		Step(`^AssetGoblin runs with arguments "([^"]*)"$`, (*applicationSuite).RunCLI).
 		Step(`^the command should exit with code (\d+)$`, (*applicationSuite).ExitCode).
+		Step(`^a CLI Python plugin$`, (*applicationSuite).PythonPlugin).
 		Step(`^command output should contain "([^"]*)"$`, (*applicationSuite).Output).
 		Step(`^command output should not contain "([^"]*)"$`, (*applicationSuite).OutputAbsent).
 		Step(`^command output should contain no terminal escape sequences$`, (*applicationSuite).NoEscapes).
 		Step(`^command (stdout|stderr) should be empty$`, (*applicationSuite).EmptyStream).
 		Step(`^the first output line should be the current version$`, (*applicationSuite).VersionFirstLine).
 		Step(`^CLI configuration contains (.*)$`, (*applicationSuite).CLIConfig).
+		Step(`^the CLI build version is "([^"]*)"$`, (*applicationSuite).CLIVersion).
 		Step(`^CLI colors are disabled$`, (*applicationSuite).DisableColors).
 		Step(`^the default plugin discovery directory is resolved$`, (*applicationSuite).DefaultPluginDirectory).
 		Step(`^plugin discovery directory "([^"]*)" is resolved$`, (*applicationSuite).PluginDirectory).
@@ -73,15 +82,6 @@ func TestApplicationFeatures(t *testing.T) {
 		Step(`^the version check should fail$`, (*applicationSuite).VersionFailure).
 		Step(`^the update archive for "([^"]*)" and "([^"]*)" at version "([^"]*)" is selected$`, (*applicationSuite).Archive).
 		Step(`^the archive filename should be "([^"]*)"$`, (*applicationSuite).ArchiveName).
-		Step(`^checksum lines "([^"]*)"$`, (*applicationSuite).ChecksumLines).
-		Step(`^the checksum for "([^"]*)" is selected$`, (*applicationSuite).SelectChecksum).
-		Step(`^its checksum should be "([^"]*)"$`, (*applicationSuite).Checksum).
-		Step(`^its checksum should be missing$`, (*applicationSuite).ChecksumMissing).
-		Step(`^a release asset "([^"]*)" at "([^"]*)"$`, (*applicationSuite).Asset).
-		Step(`^the update URL for "([^"]*)" is selected$`, (*applicationSuite).SelectUpdateURL).
-		Step(`^the checksum URL is selected$`, (*applicationSuite).SelectChecksumURL).
-		Step(`^the selected asset URL should be "([^"]*)"$`, (*applicationSuite).AssetURL).
-		Step(`^no matching asset should be found$`, (*applicationSuite).AssetMissing).
 		Step(`^the startup banner should be present$`, (*applicationSuite).Banner).
 		Step(`^the current build version should be reported$`, (*applicationSuite).BuildVersion).
 		Step(`^a download of (\d+) bytes with advertised size (-?\d+) uses (terminal|redirected) progress and (succeeds|fails)$`, (*applicationSuite).DownloadProgress).
@@ -98,36 +98,42 @@ type releaseTransport struct {
 }
 
 func (t releaseTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Existing CLI fixtures describe a single release; GitHub's listing API returns an array.
+	var release map[string]any
+	if json.Unmarshal([]byte(t.Body), &release) == nil && release != nil {
+		if tag, ok := release["tag_name"].(string); ok && tag != "" {
+			release["assets"] = []any{map[string]any{"id": 1, "name": fixtureArchiveName(tag, runtime.GOOS, runtime.GOARCH)}, map[string]any{"id": 2, "name": "checksums.txt"}}
+		}
+		encoded, err := json.Marshal([]any{release})
+		if err != nil {
+			return nil, err
+		}
+		t.Body = string(encoded)
+	}
+
 	return &http.Response{StatusCode: t.Status, Status: fmt.Sprintf("%d %s", t.Status, http.StatusText(t.Status)), Header: make(http.Header), Body: io.NopCloser(strings.NewReader(t.Body)), Request: req}, nil
 }
 
 type applicationSuite struct {
-	assets     []releaseAsset
-	assetURL   string
-	assetFound bool
 	gocuke.TestingT
-	output, directory, version, archive, checksum string
-	stdout, stderr                                string
-	exit                                          int
-	err                                           error
-	checksums                                     map[string]string
-	transport                                     http.RoundTripper
-	oldRelease                                    *release
-	noColor                                       bool
-	dir                                           string
+	output, directory, version, archive string
+	stdout, stderr                      string
+	exit                                int
+	err                                 error
+	transport                           http.RoundTripper
+	noColor                             bool
+	cliVersion                          string
+	dir                                 string
 }
 
 func (s *applicationSuite) Before() {
 	s.transport = http.DefaultTransport
-	s.oldRelease = r
-	s.assets = nil
-	s.assetURL = ""
-	s.assetFound = false
 	s.err = nil
 	s.output = ""
 	s.stdout, s.stderr = "", ""
 	s.exit = 0
 	s.noColor = false
+	s.cliVersion = ""
 	var err error
 	s.dir, err = os.MkdirTemp("", "assetgoblin-cli-features-")
 	if err != nil {
@@ -136,7 +142,6 @@ func (s *applicationSuite) Before() {
 }
 func (s *applicationSuite) After() {
 	http.DefaultTransport = s.transport
-	r = s.oldRelease
 	os.RemoveAll(s.dir)
 }
 func (s *applicationSuite) RunCLI(args string) {
@@ -160,6 +165,9 @@ func (s *applicationSuite) RunCLI(args string) {
 			s.Fatal(err)
 		}
 		cmd.Env = append(cmd.Env, "ASSETGOBLIN_CLI_RELEASE="+string(mock))
+	}
+	if s.cliVersion != "" {
+		cmd.Env = append(cmd.Env, "ASSETGOBLIN_CLI_VERSION="+s.cliVersion)
 	}
 	if s.noColor {
 		cmd.Env = append(cmd.Env, "NO_COLOR=1")
@@ -214,7 +222,13 @@ func (s *applicationSuite) WorkingDirectory() {
 func (s *applicationSuite) ReleaseAPI(status int64, body string) {
 	http.DefaultTransport = releaseTransport{Status: int(status), Body: body}
 }
-func (s *applicationSuite) Latest() { s.version, s.err = getLatestVersion() }
+func (s *applicationSuite) Latest() {
+	latest, err := getLatestRelease()
+	s.err = err
+	if err == nil {
+		s.version = "v" + latest.Version()
+	}
+}
 func (s *applicationSuite) Version(version string) {
 	s.Helper()
 	if s.err != nil || s.version != version {
@@ -228,7 +242,17 @@ func (s *applicationSuite) VersionFailure() {
 	}
 }
 func (s *applicationSuite) Archive(goos, arch, version string) {
-	s.archive = releaseArchiveName(version, goos, arch)
+	name := fixtureArchiveName(version, goos, arch)
+	http.DefaultTransport = releaseTransport{Status: 200, Body: fmt.Sprintf(`[{"tag_name":%q,"assets":[{"id":1,"name":%q},{"id":2,"name":"checksums.txt"}]}]`, version, name)}
+	updater, err := newUpdater(goos, arch, nil)
+	if err != nil {
+		s.Fatal(err)
+	}
+	latest, err := detectLatest(updater)
+	if err != nil {
+		s.Fatal(err)
+	}
+	s.archive = latest.AssetName
 }
 func (s *applicationSuite) ArchiveName(name string) {
 	s.Helper()
@@ -236,43 +260,6 @@ func (s *applicationSuite) ArchiveName(name string) {
 		s.Fatalf("wrong archive name %s", s.archive)
 	}
 }
-func (s *applicationSuite) ChecksumLines(lines string) {
-	s.checksums = parseChecksums(strings.ReplaceAll(lines, ";", "\n"))
-}
-func (s *applicationSuite) SelectChecksum(name string) { s.checksum = s.checksums[name] }
-func (s *applicationSuite) Checksum(value string) {
-	s.Helper()
-	if s.checksum != value {
-		s.Fatalf("wrong checksum %q", s.checksum)
-	}
-}
-func (s *applicationSuite) ChecksumMissing() {
-	s.Helper()
-	if s.checksum != "" {
-		s.Fatal("missing archive unexpectedly has a checksum")
-	}
-}
-
-func (s *applicationSuite) Asset(name, url string) {
-	s.assets = append(s.assets, releaseAsset{Name: name, BrowserDownloadURL: url})
-}
-func (s *applicationSuite) SelectUpdateURL(name string) {
-	s.assetURL, s.assetFound = findUpdateURL(s.assets, name)
-}
-func (s *applicationSuite) SelectChecksumURL() { s.assetURL, s.assetFound = findChecksumURL(s.assets) }
-func (s *applicationSuite) AssetURL(url string) {
-	s.Helper()
-	if !s.assetFound || s.assetURL != url {
-		s.Fatalf("wrong selected asset URL %q (found %v)", s.assetURL, s.assetFound)
-	}
-}
-func (s *applicationSuite) AssetMissing() {
-	s.Helper()
-	if s.assetFound || s.assetURL != "" {
-		s.Fatal("unexpected matching release asset")
-	}
-}
-
 func (s *applicationSuite) Banner() {
 	s.Helper()
 	if Logo == "" || !strings.Contains(s.output, Logo) {
@@ -382,3 +369,26 @@ func (s *applicationSuite) OutputWidth(width int64) {
 		}
 	}
 }
+
+func (s *applicationSuite) PythonPlugin() {
+	s.Helper()
+	source := `plugin = {"api_version": 1, "routes": [{"path": "/test/", "directory": "."}]}`
+	if err := os.WriteFile(filepath.Join(s.dir, "assetgoblin-test.py"), []byte(source), 0600); err != nil {
+		s.Fatal(err)
+	}
+}
+
+// fixtureArchiveName independently models the published GoReleaser archive names.
+func fixtureArchiveName(version, goos, arch string) string {
+	osName := strings.ToUpper(goos[:1]) + goos[1:]
+	if goos == "darwin" {
+		osName = "macOS"
+	}
+	suffix := ".tar.gz"
+	if goos == "windows" {
+		suffix = ".zip"
+	}
+	return "AssetGoblin_" + version + "_" + osName + "_" + map[string]string{"amd64": "x64", "386": "x86", "arm64": "arm64"}[arch] + suffix
+}
+
+func (s *applicationSuite) CLIVersion(version string) { s.cliVersion = version }

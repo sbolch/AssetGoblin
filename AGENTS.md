@@ -39,8 +39,10 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 - Go 1.27.3 or newer
 - FFmpeg on PATH for optional audio/video transformations
 - `github.com/go-fuego/fuego` - HTTP server and routing
-- `github.com/yuin/gopher-lua` - Portable startup-loaded Lua plugins
+- Python 3.10+ on PATH (or configured through `python_executable`) for primary runtime plugins
 - `github.com/spf13/viper` - Configuration management
+- `github.com/creativeprojects/go-selfupdate` - Stable release discovery, checksum validation and executable replacement
+- `github.com/sethvargo/go-limiter` - In-memory fixed-window per-IP HTTP rate limiting
 
 ## Code Architecture
 
@@ -50,7 +52,7 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 - `image` - Image processing and serving
 - `middleware` - HTTP middleware (rate limiting, authentication)
 - `utils` - Common utilities (file/reader closing) and ImagePreset struct
-- `plugin` - Lua plugin discovery, request callbacks, generic process execution and file serving
+- `plugin` - Python plugin discovery, request callbacks, generic process execution and file serving
 - `main` - Entry point and CLI handling
 
 ### Logging
@@ -66,11 +68,15 @@ slog.Warn("Failed to save gob file", "error", err)
 ### HTTP Server
 
 Uses Fuego with standard HTTP handlers and explicit timeouts. `newServer` is shared
-by production and server tests. OpenAPI output is disabled. Runtime plugins are
-`assetgoblin-*.lua` files beside the executable, loaded only when serving starts.
+by production and server tests and returns a cleanup function that closes its rate limiter. OpenAPI output is disabled. Runtime plugins are
+`assetgoblin-*.py` files beside the executable, loaded only when serving starts.
+Additional runtimes require explicit `plugin.RegisterBackend` registration.
+Default builds load Python only.
+Python uses one persistent subprocess per plugin and a shared Go validation layer.
+`python_executable` selects an interpreter in configuration; inheritance cannot cross registered runtimes.
 `-plugins-dir` overrides discovery (needed for `go run`). Examples and their
 documentation live in `plugins/{audio,video,qoi,qoa}` and distribute
-Lua files independently; there are no build tags or local module
+Python files independently; there are no build tags or local module
 replacements. Run `go test ./... -race` when changing plugin integration.
 
 The embedded `http.Server` has timeouts configured:
@@ -87,7 +93,7 @@ srv := &http.Server{
 
 ### Testing
 
-Core process tests use an arbitrary text-processing tool. Example Lua scripts are
+Core process tests use an arbitrary text-processing tool. Example Python scripts are
 responsible for audio/video formats, validation, codecs, FFmpeg arguments and filters.
 Keep the host application-neutral: it provides file staging, declared-tool execution,
 size/deadline limits, caching and HTTP responses. Tools run with the server user's
@@ -127,8 +133,8 @@ leaves register routes/codecs. Process pipelines share one deadline.
 - `main.go` - Entry point with CLI flag parsing
 - `serve.go` - HTTP server setup
 - `plugin.go` - Executable-relative plugin discovery
-- `plugin/load.go` - Lua interpreter setup and plugin API validation
-- `plugin/serve.go` - Lua callbacks and root-scoped file serving
+- `plugin/load.go` - Runtime discovery and shared plugin API validation
+- `plugin/serve.go` - Runtime callbacks and root-scoped file serving
 - `plugin/process.go` - Generic plugin-defined tool execution and caching
 - `version.go` - Version management and auto-update
 - `config/load.go` - Configuration loading

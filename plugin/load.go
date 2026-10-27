@@ -1,8 +1,7 @@
-// Package plugin loads portable Lua request plugins at server startup.
+// Package plugin loads Python plugins and explicitly registered optional runtimes at server startup.
 package plugin
 
 import (
-	"assetgoblin/image"
 	"context"
 	"fmt"
 	"net/http"
@@ -10,10 +9,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
-	lua "github.com/yuin/gopher-lua"
+	"assetgoblin/image"
 )
 
 const (
@@ -27,7 +27,7 @@ type RouteHandler interface {
 	Handler() func(http.ResponseWriter, *http.Request)
 }
 
-// Manager owns the Lua interpreters and registered routes. Close after requests stop.
+// Manager owns the plugin runtimes and registered routes. Close after requests stop.
 type Manager struct {
 	scripts []*script
 	routes  []RouteHandler
@@ -35,7 +35,7 @@ type Manager struct {
 }
 
 type script struct {
-	state    *lua.LState
+	close    func()
 	gate     chan struct{}
 	closed   bool
 	filename string
@@ -46,9 +46,13 @@ type script struct {
 	codecs   map[string]image.Codec
 }
 
-// Load discovers assetgoblin-*.lua files, in filename order. Invalid plugins fail
+// Load discovers assetgoblin-*.py and registered backend files, in filename order.
+// Python takes precedence when both files have the same plugin name. Invalid plugins fail
 // startup atomically; unrelated files are ignored. An empty directory is valid.
-func Load(directory string) (*Manager, error) {
+func Load(directory string) (*Manager, error) { return load(directory, "") }
+
+func load(directory, pythonExecutable string) (*Manager, error) {
+	backends := registeredBackends()
 	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, fmt.Errorf("read plugin directory: %w", err)
@@ -56,19 +60,36 @@ func Load(directory string) (*Manager, error) {
 	manager := &Manager{codecs: map[string]image.Codec{}}
 	catalog := map[string]string{}
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "assetgoblin-") && strings.HasSuffix(entry.Name(), ".lua") {
-			catalog[strings.TrimSuffix(strings.TrimPrefix(entry.Name(), "assetgoblin-"), ".lua")] = filepath.Join(directory, entry.Name())
-		}
-	}
-	replaced := map[string]bool{}
-	seen := map[string]bool{}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasPrefix(name, "assetgoblin-") || !strings.HasSuffix(name, ".lua") {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "assetgoblin-") {
 			continue
 		}
-		filename := filepath.Join(directory, name)
-		plugin, routes, err := loadScript(filename, catalog)
+		ext := filepath.Ext(entry.Name())
+		if ext != ".py" && backends[ext] == nil {
+			continue
+		}
+		name := strings.TrimSuffix(strings.TrimPrefix(entry.Name(), "assetgoblin-"), ext)
+		if catalog[name] == "" || ext == ".py" {
+			catalog[name] = filepath.Join(directory, entry.Name())
+		}
+	}
+
+	replaced := map[string]bool{}
+	seen := map[string]bool{}
+	names := make([]string, 0, len(catalog))
+	for _, filename := range catalog {
+		names = append(names, filename)
+	}
+	slices.Sort(names)
+	for _, filename := range names {
+		name := filepath.Base(filename)
+		var plugin *script
+		var routes []RouteHandler
+		var err error
+		if filepath.Ext(filename) == ".py" {
+			plugin, routes, err = loadPython(filename, catalog, pythonExecutable)
+		} else {
+			plugin, routes, err = loadBackend(backends[filepath.Ext(filename)], filename, catalog)
+		}
 		if err != nil {
 			manager.Close()
 			return nil, fmt.Errorf("plugin %s: %w", name, err)
@@ -104,7 +125,7 @@ func Load(directory string) (*Manager, error) {
 }
 
 // Handlers returns an independent route list. Plugins cannot modify the server registry.
-func (m *Manager) Handlers() []RouteHandler { return append([]RouteHandler(nil), m.routes...) }
+func (m *Manager) Handlers() []RouteHandler { return slices.Clone(m.routes) }
 
 // Close releases interpreters. It is safe to call more than once.
 func (m *Manager) Close() error {
@@ -112,115 +133,107 @@ func (m *Manager) Close() error {
 		plugin.gate <- struct{}{}
 		if !plugin.closed {
 			plugin.closed = true
-			plugin.state.Close()
+			plugin.close()
 		}
 		<-plugin.gate
 	}
 	return nil
 }
 
-func loadScript(filename string, catalog map[string]string) (_ *script, _ []RouteHandler, err error) {
-	state := lua.NewState(lua.Options{SkipOpenLibs: true})
-	defer func() {
-		if err != nil {
-			state.Close()
-		}
-	}()
-	for _, lib := range []struct {
-		name string
-		open lua.LGFunction
-	}{
-		{lua.BaseLibName, lua.OpenBase}, {lua.TabLibName, lua.OpenTable},
-		{lua.StringLibName, lua.OpenString}, {lua.MathLibName, lua.OpenMath},
-	} {
-		if err = state.CallByParam(lua.P{Fn: state.NewFunction(lib.open), NRet: 0, Protect: true}, lua.LString(lib.name)); err != nil {
-			return nil, nil, err
-		}
-	}
-	// No host filesystem, process, package loader, or debug access from Lua.
-	for _, name := range []string{"dofile", "loadfile", "print"} {
-		state.SetGlobal(name, lua.LNil)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), scriptTimeout)
+func newScript(filename string) *script {
+	return &script{filename: filename, gate: make(chan struct{}, 1), tools: map[string]bool{}, codecs: map[string]image.Codec{}}
+}
+
+func (s *script) invoke(ctx context.Context, fn Callback, request map[string]any) (any, error) {
+	ctx, cancel := context.WithTimeout(ctx, scriptTimeout)
 	defer cancel()
-	state.SetContext(ctx)
-	defer state.RemoveContext()
-	manifest, parents, revision, err := evaluateManifest(state, filename, catalog, map[string]bool{})
-	if err != nil {
-		return nil, nil, err
+	select {
+	case s.gate <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
-	if manifest.RawGetString("api_version") != lua.LNumber(1) {
-		return nil, nil, fmt.Errorf("unsupported api_version (expected 1)")
+	defer func() { <-s.gate }()
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	list, ok := manifest.RawGetString("routes").(*lua.LTable)
-	if !ok && manifest.RawGetString("routes") != lua.LNil {
-		return nil, nil, fmt.Errorf("routes must be an array")
+	if s.closed {
+		return nil, fmt.Errorf("plugin is closed")
 	}
-	if !ok && manifest.RawGetString("image_codecs") == lua.LNil {
-		return nil, nil, fmt.Errorf("plugin needs routes or image_codecs")
+	return fn(ctx, request)
+}
+
+func (plugin *script) loadManifest(value any) ([]RouteHandler, error) {
+	manifest, ok := value.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("plugin must return a manifest object")
 	}
-	plugin := &script{state: state, gate: make(chan struct{}, 1), filename: filename, tools: map[string]bool{}, revision: revision, parents: parents, codecs: map[string]image.Codec{}}
-	if value := manifest.RawGetString("tools"); value != lua.LNil {
-		list, ok := value.(*lua.LTable)
+	if manifest["api_version"] != float64(1) {
+		return nil, fmt.Errorf("unsupported api_version (expected 1)")
+	}
+	list, ok := manifest["routes"].([]any)
+	if !ok && manifest["routes"] != nil {
+		return nil, fmt.Errorf("routes must be an array")
+	}
+	if !ok && manifest["image_codecs"] == nil {
+		return nil, fmt.Errorf("plugin needs routes or image_codecs")
+	}
+	if value := manifest["tools"]; value != nil {
+		tools, ok := value.([]any)
 		if !ok {
-			return nil, nil, fmt.Errorf("tools must be an array")
+			return nil, fmt.Errorf("tools must be an array")
 		}
-		for i := 1; i <= list.Len(); i++ {
-			name, ok := list.RawGetInt(i).(lua.LString)
-			if !ok || !validToolName(string(name)) {
-				return nil, nil, fmt.Errorf("invalid tool declaration")
+		for _, v := range tools {
+			name, ok := v.(string)
+			if !ok || !validToolName(name) {
+				return nil, fmt.Errorf("invalid tool declaration")
 			}
-			plugin.tools[string(name)] = true
+			plugin.tools[name] = true
 		}
 	}
-	count := 0
-	if list != nil {
-		count = list.Len()
-	}
-	routes := make([]RouteHandler, 0, count)
-	for i := 1; i <= count; i++ {
-		spec, ok := list.RawGetInt(i).(*lua.LTable)
+	routes := make([]RouteHandler, 0, len(list))
+	for i, v := range list {
+		spec, ok := v.(map[string]any)
 		if !ok {
-			return nil, nil, fmt.Errorf("route %d must be a table", i)
+			return nil, fmt.Errorf("route %d must be an object", i+1)
 		}
-		prefix, ok := spec.RawGetString("path").(lua.LString)
-		if !ok || !validPrefix(string(prefix)) {
-			return nil, nil, fmt.Errorf("route %d has invalid path", i)
+		prefix, ok := spec["path"].(string)
+		if !ok || !validPrefix(prefix) {
+			return nil, fmt.Errorf("route %d has invalid path", i+1)
 		}
-		route := &routeHandler{prefix: string(prefix), plugin: plugin}
-		if value := spec.RawGetString("directory"); value != lua.LNil {
-			directory, ok := value.(lua.LString)
+		route := &routeHandler{prefix: prefix, plugin: plugin}
+		if value := spec["directory"]; value != nil {
+			directory, ok := value.(string)
 			if !ok || directory == "" {
-				return nil, nil, fmt.Errorf("route %d has invalid directory", i)
+				return nil, fmt.Errorf("route %d has invalid directory", i+1)
 			}
-			route.directory, err = filepath.Abs(string(directory))
+			var err error
+			route.directory, err = filepath.Abs(directory)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		}
-		if spec.RawGetString("media") != lua.LNil {
-			return nil, nil, fmt.Errorf("media route types are no longer supported; declare plugin tools and custom logic")
+		if spec["media"] != nil {
+			return nil, fmt.Errorf("media route types are no longer supported; declare plugin tools and custom logic")
 		}
-		if value := spec.RawGetString("handle"); value != lua.LNil {
-			route.handle, ok = value.(*lua.LFunction)
+		if value := spec["handle"]; value != nil {
+			route.handle, ok = value.(Callback)
 			if !ok {
-				return nil, nil, fmt.Errorf("route %d handle must be a function", i)
+				return nil, fmt.Errorf("route %d handle must be a function", i+1)
 			}
 		}
 		if route.directory == "" && route.handle == nil {
-			return nil, nil, fmt.Errorf("route %d needs directory or handle", i)
+			return nil, fmt.Errorf("route %d needs directory or handle", i+1)
 		}
 		routes = append(routes, route)
 	}
-	if err := plugin.loadCodecs(manifest.RawGetString("image_codecs")); err != nil {
-		return nil, nil, err
+	if err := plugin.loadCodecs(manifest["image_codecs"]); err != nil {
+		return nil, err
 	}
 	if len(routes) == 0 && len(plugin.codecs) == 0 {
-		return nil, nil, fmt.Errorf("plugin needs nonempty routes or image_codecs")
+		return nil, fmt.Errorf("plugin needs nonempty routes or image_codecs")
 	}
-	return plugin, routes, nil
+	return routes, nil
 }
-
 func validPrefix(prefix string) bool {
 	decoded, err := url.PathUnescape(prefix)
 	return err == nil && decoded == prefix && prefix != "/" && strings.HasPrefix(prefix, "/") &&
