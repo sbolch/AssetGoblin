@@ -36,7 +36,7 @@ GOOS=windows GOARCH=amd64 go build -o assetgoblin-windows-amd64.exe
 
 ## Key Dependencies
 
-- Go 1.27.2 or newer
+- Go 1.27.3 or newer
 - FFmpeg on PATH for optional audio/video transformations
 - `github.com/go-fuego/fuego` - HTTP server and routing
 - `github.com/yuin/gopher-lua` - Portable startup-loaded Lua plugins
